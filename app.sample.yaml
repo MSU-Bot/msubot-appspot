@@ -1,0 +1,15 @@
+runtime: go
+api_version: go1
+env_variables:
+  FIREBASE_PROJECT: "Project_here"
+  DATADOG_API_KEY: 'datadog_key'
+  PLIVO_AUTH_ID: "p_k"
+  PLIVO_AUTH_TOKEN: "p_k"
+
+
+handlers:
+- url: /datadog
+  script: gae_datadog.datadog.app
+# All URLs are handled by the Go application script
+- url: /.*
+  script: _go_app
