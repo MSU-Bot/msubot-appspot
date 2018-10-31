@@ -156,8 +156,8 @@ func SendText(client *http.Client, number, message string) (response *http.Respo
 	return resp, err
 }
 
-// FetchUserData check firebase to see if the user exists in out database
-func FetchUserData(ctx context.Context, fbClient *firestore.Client, number string) (map[string]interface{}, string) {
+// FetchUserDataWithNumber check firebase to see if the user exists in our database
+func FetchUserDataWithNumber(ctx context.Context, fbClient *firestore.Client, number string) (map[string]interface{}, string) {
 	checkedNumber := fmt.Sprintf("+%v", strings.Trim(number, " "))
 
 	docs := fbClient.Collection("users").Where("number", "==", checkedNumber).Documents(ctx)
@@ -183,6 +183,26 @@ func LookupUserNumber(ctx context.Context, fbClient *firestore.Client, uid strin
 		return "", err
 	}
 	return doc.Data()["number"].(string), nil
+}
+
+// GetFirebaseClient creates and returns a new firebase client, used to interact with the database
+func GetFirebaseClient(ctx context.Context) *firestore.Client {
+	firebasePID := os.Getenv("FIREBASE_PROJECT")
+	log.Debugf(ctx, "Loaded firebase project ID.")
+	if firebasePID == "" {
+		log.Criticalf(ctx, "Firebase Project ID is nil, I cannot continue.")
+		panic("Firebase Project ID is nil")
+	}
+
+	fbClient, err := firestore.NewClient(ctx, firebasePID)
+	defer fbClient.Close()
+	if err != nil {
+		log.Errorf(ctx, "Could not create new client for Firebase %v", err)
+		return nil
+	}
+	log.Debugf(ctx, "successfully opened firestore client")
+
+	return fbClient
 }
 
 // LookupUserSections looks up the tracked sections of a user

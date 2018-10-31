@@ -48,7 +48,7 @@ func WelcomeUserHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	phNum := strings.Join(rawphNum, "")
 
-	userData, uid := FetchUserData(ctx, fbClient, phNum)
+	userData, uid := FetchUserDataWithNumber(ctx, fbClient, phNum)
 	if userData == nil {
 		log.Errorf(ctx, "User doesn't exist in the database. Userdata: %v", userData)
 		w.WriteHeader(http.StatusBadRequest)
