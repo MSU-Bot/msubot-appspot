@@ -12,7 +12,7 @@ import (
 	"google.golang.org/appengine/urlfetch"
 )
 
-// CheckSectionsHandler runs often to check for
+// CheckSectionsHandler runs often to check for open seats
 func CheckSectionsHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Load up a context and http client
@@ -20,18 +20,19 @@ func CheckSectionsHandler(w http.ResponseWriter, r *http.Request) {
 	client := urlfetch.Client(ctx)
 	log.Infof(ctx, "Context loaded. Starting execution.")
 
-	// Make sure the request is from the appengine cron
-	if r.Header.Get("X-Appengine-Cron") == "" {
-		log.Warningf(ctx, "Request is not from the cron. Exiting")
-		w.WriteHeader(403)
-		return
-	}
+	// // Make sure the request is from the appengine cron
+	// if r.Header.Get("X-Appengine-Cron") == "" {
+	// 	log.Warningf(ctx, "Request is not from the cron. Exiting")
+	// 	w.WriteHeader(403)
+	// 	return
+	// }
 
 	fbClient := GetFirebaseClient(ctx)
 	if fbClient == nil {
 		w.WriteHeader(500)
 		return
 	}
+	defer fbClient.Close()
 
 	// Get the list of sections we are actively tracking
 	sectionsSnapshot := fbClient.Collection("tracked_sections").Documents(ctx)
@@ -39,7 +40,8 @@ func CheckSectionsHandler(w http.ResponseWriter, r *http.Request) {
 	// Actually get all the data within these docs
 	sectionDocuments, err := sectionsSnapshot.GetAll()
 	if err != nil {
-		log.Errorf(ctx, "Error getting tracked_sections!")
+		log.Errorf(ctx, "Error getting tracked_sections! sec: %v", sectionDocuments)
+		log.Errorf(ctx, "Error getting tracked_sections! Err: %v", err)
 		w.WriteHeader(500)
 		return
 	}
@@ -91,24 +93,32 @@ func sectionCheckWorker(ctx context.Context, jobs <-chan *firestore.DocumentSnap
 		sectionData := doc.Data()
 		if sectionData == nil {
 			log.Errorf(ctx, "unexpected error with getting data for course")
-			return
+
+			returnChannel <- 0
+			continue
 		}
 
 		// Type conversions
 		term, ok := sectionData["term"].(string)
 		if !ok {
 			log.Errorf(ctx, "type conv failed for courseNumber")
-			panic("foo")
+
+			returnChannel <- 0
+			continue
 		}
 		departmentAbbr, ok := sectionData["departmentAbbr"].(string)
 		if !ok {
 			log.Errorf(ctx, "type conv failed for courseNumber")
-			panic("foo")
+
+			returnChannel <- 0
+			continue
 		}
 		courseNumber, ok := sectionData["courseNumber"].(string)
 		if !ok {
 			log.Errorf(ctx, "type conv failed for courseNumber")
-			panic("foo")
+
+			returnChannel <- 0
+			continue
 		}
 		crn := doc.Ref.ID
 
@@ -116,7 +126,9 @@ func sectionCheckWorker(ctx context.Context, jobs <-chan *firestore.DocumentSnap
 		resp, err := MakeAtlasSectionRequest(client, term, departmentAbbr, courseNumber)
 		if err != nil {
 			log.Errorf(ctx, "Making Atlas request failed for %v: %v", departmentAbbr+courseNumber, err)
-			return
+
+			returnChannel <- 0
+			continue
 		}
 
 		// Parse into a section struct
@@ -124,25 +136,33 @@ func sectionCheckWorker(ctx context.Context, jobs <-chan *firestore.DocumentSnap
 		if err != nil {
 			log.Errorf(ctx, "Parsing section failed: %v", err)
 
+			returnChannel <- 0
+			continue
 		}
 		// If we somehow get back more than one section, something super borked earlier
 		if len(newSectionData) > 1 {
 			log.Errorf(ctx, "Something went wrong with parsing the section response. Expected 1 section, recieved %v", len(newSectionData))
-			return
+
+			returnChannel <- 0
+			continue
 		}
 
 		// If we didn't get back any, warn us and move on.
 		// This typically occurs when Banner is down
 		if len(newSectionData) == 0 {
 			log.Warningf(ctx, "Couldn't find section from MSU")
-			return
+
+			returnChannel <- 0
+			continue
 		}
 
 		// Parse the new available seats to an int
 		newSeatsAvailable, err := strconv.Atoi(newSectionData[0].AvailableSeats)
 		if err != nil {
 			log.Errorf(ctx, "couldn't parse newSeatsAvailable: %v", err)
-			return
+
+			returnChannel <- 0
+			continue
 		}
 
 		// If there are seats available
@@ -150,16 +170,22 @@ func sectionCheckWorker(ctx context.Context, jobs <-chan *firestore.DocumentSnap
 			users, ok := sectionData["users"].([]interface{})
 			if !ok {
 				log.Errorf(ctx, "couldn't parse userslice")
-				return
+
+				returnChannel <- 0
+				continue
 			}
 			sendOpenSeatMessages(ctx, client, fbClient, users, newSectionData[0])
 			removeSectionFromUserData(ctx, fbClient, fbBatch, users, newSectionData[0].Crn)
 			fbBatch.Delete(fbClient.Collection("tracked_sections").Doc(crn))
-			return
+
+			returnChannel <- 0
+			continue
 		}
 
 		// If we get here, we just need to update the stored section model so it's all clean and nice
 		updateTrackedSection(ctx, fbBatch, fbClient.Collection("tracked_sections").Doc(newSectionData[0].Crn), newSectionData[0])
+
+		returnChannel <- 0
 	}
 }
 
@@ -220,7 +246,6 @@ func sendOpenSeatMessages(ctx context.Context, client *http.Client, fbClient *fi
 			userNumbers = fmt.Sprintf("%v<%v", userNumbers, number)
 		}
 	}
-	log.Infof(ctx, userNumbers)
 	resp, err := SendText(client, userNumbers, message)
 	if err != nil {
 		log.Errorf(ctx, "error sending text: %v", err)

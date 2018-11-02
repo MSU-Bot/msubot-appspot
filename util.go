@@ -195,7 +195,6 @@ func GetFirebaseClient(ctx context.Context) *firestore.Client {
 	}
 
 	fbClient, err := firestore.NewClient(ctx, firebasePID)
-	defer fbClient.Close()
 	if err != nil {
 		log.Errorf(ctx, "Could not create new client for Firebase %v", err)
 		return nil

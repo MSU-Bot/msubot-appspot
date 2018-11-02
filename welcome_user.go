@@ -63,7 +63,7 @@ func WelcomeUserHandler(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(200)
 		return
 	}
-	messageText := fmt.Sprintf("Thanks for signing up for MSUBot! We'll text you from this number when a seat opens up. Text HELP for some useful commands. Go Cats!")
+	messageText := fmt.Sprintf("Thanks for signing up for MSUBot! We'll text you from this number when a seat opens up. Go Cats!")
 	_, err = SendText(client, userData["number"].(string), messageText)
 	if err != nil {
 		log.Errorf(ctx, "Could not send text to user!")

@@ -10,8 +10,11 @@ import (
 	"google.golang.org/appengine/log"
 )
 
-// DatabaseCleanupHandler sends the user their welcome text to MSUBot.
+// DatabaseCleanupHandler
 func DatabaseCleanupHandler(w http.ResponseWriter, r *http.Request) {
+
+	// Disable for now
+	return
 
 	//---------------------
 	ctx := appengine.NewContext(r)
