@@ -20,12 +20,12 @@ func CheckSectionsHandler(w http.ResponseWriter, r *http.Request) {
 	client := urlfetch.Client(ctx)
 	log.Infof(ctx, "Context loaded. Starting execution.")
 
-	// // Make sure the request is from the appengine cron
-	// if r.Header.Get("X-Appengine-Cron") == "" {
-	// 	log.Warningf(ctx, "Request is not from the cron. Exiting")
-	// 	w.WriteHeader(403)
-	// 	return
-	// }
+	// Make sure the request is from the appengine cron
+	if r.Header.Get("X-Appengine-Cron") == "" {
+		log.Warningf(ctx, "Request is not from the cron. Exiting")
+		w.WriteHeader(403)
+		return
+	}
 
 	fbClient := GetFirebaseClient(ctx)
 	if fbClient == nil {
