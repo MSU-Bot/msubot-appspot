@@ -14,5 +14,6 @@ func main() {
 	http.HandleFunc("/prunesections", PruneSectionsHandler)
 	http.HandleFunc("/DatabaseCleanup", DatabaseCleanupHandler)
 	http.HandleFunc("/receivemessage", ReceiveMessageHandler)
+	http.HandleFunc("/healthcheck", HealthcheckHandler)
 	appengine.Main() // Starts the server to receive requests
 }

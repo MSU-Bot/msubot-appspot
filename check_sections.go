@@ -174,6 +174,7 @@ func sectionCheckWorker(ctx context.Context, jobs <-chan *firestore.DocumentSnap
 				returnChannel <- 0
 				continue
 			}
+			log.Infof(ctx, "The CRN %s has %d open seats. Sending a message to %d users.", crn, newSeatsAvailable, len(users))
 			sendOpenSeatMessages(ctx, client, fbClient, users, newSectionData[0])
 			removeSectionFromUserData(ctx, fbClient, fbBatch, users, newSectionData[0].Crn)
 			fbBatch.Delete(fbClient.Collection("tracked_sections").Doc(crn))
@@ -238,7 +239,7 @@ func sendOpenSeatMessages(ctx context.Context, client *http.Client, fbClient *fi
 	for _, user := range users {
 		number, err := LookupUserNumber(ctx, fbClient, user.(string))
 		if err != nil {
-
+			log.Errorf(ctx, "Unable to send a text to user %s", user.(string))
 		}
 		if userNumbers == "" {
 			userNumbers = number
