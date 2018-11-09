@@ -165,6 +165,20 @@ func sectionCheckWorker(ctx context.Context, jobs <-chan *firestore.DocumentSnap
 			continue
 		}
 
+		users, ok := sectionData["users"].([]interface{})
+		if !ok {
+			log.Errorf(ctx, "couldn't parse userslice")
+			returnChannel <- 0
+			continue
+		}
+
+		if len(users) < 1 {
+			log.Infof(ctx, "CRN %s has %d users. Deleting CRN", crn, len(users))
+			fbBatch.Delete(fbClient.Collection("tracked_sections").Doc(crn))
+			returnChannel <- 0
+			continue
+		}
+
 		// If there are seats available
 		if newSeatsAvailable > 0 {
 			users, ok := sectionData["users"].([]interface{})
@@ -215,7 +229,7 @@ func removeSectionFromUserData(ctx context.Context, fbClient *firestore.Client, 
 		}
 		untypedUserdata := userDataMap["sections"]
 		if untypedUserdata == nil {
-			log.Warningf(ctx, "found legacy user with no tracked sections.")
+			log.Infof(ctx, "found user with no tracked sections on their userdata.")
 			continue
 		}
 		sectionSlice := untypedUserdata.([]interface{})
