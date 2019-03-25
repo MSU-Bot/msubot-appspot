@@ -1,7 +1,7 @@
 cron:
-- description: "daily section prune"
+- description: "section prune"
   url: /prunesections
-  schedule: every 24 hours
+  schedule: every monday 09:00
 - description: "periodic section check"
   url: /checktrackedsections
   schedule: every 12 minutes 

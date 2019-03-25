@@ -2,157 +2,54 @@ package main
 
 import (
 	"net/http"
-	"os"
 
-	"cloud.google.com/go/firestore"
-	"google.golang.org/api/iterator"
 	"google.golang.org/appengine"
 	"google.golang.org/appengine/log"
 )
 
-// DatabaseCleanupHandler
+// DatabaseCleanupHandler is awesome
 func DatabaseCleanupHandler(w http.ResponseWriter, r *http.Request) {
-
-	// Disable for now
 	return
-
-	//---------------------
+	// Load up a context and http client
 	ctx := appengine.NewContext(r)
 	log.Infof(ctx, "Context loaded. Starting execution.")
 
-	firebasePID := os.Getenv("FIREBASE_PROJECT")
-	log.Debugf(ctx, "Loaded firebase project ID: %v", firebasePID)
-	if firebasePID == "" {
-		log.Criticalf(ctx, "Firebase Project ID is nil, I cannot continue.")
-		panic("Firebase Project ID is nil")
-	}
+	// // Make sure the request is from the appengine cron
+	// if r.Header.Get("X-Appengine-Cron") == "" {
+	// 	log.Warningf(ctx, "Request is not from the cron. Exiting")
+	// 	w.WriteHeader(403)
+	// 	return
+	// }
 
-	fbClient, err := firestore.NewClient(ctx, firebasePID)
-	defer fbClient.Close()
-	if err != nil {
-		log.Errorf(ctx, "Could not create new client for Firebase %v", err)
+	fbClient := GetFirebaseClient(ctx)
+	if fbClient == nil {
 		w.WriteHeader(500)
 		return
 	}
+	defer fbClient.Close()
 
-	dcIter := fbClient.Collection("departments").Documents(ctx)
-	batch := fbClient.Batch()
-	batchSize := 0
-	for {
-		doc, err := dcIter.Next()
-		if err == iterator.Done {
-			break
-		}
-		if err != nil {
-			log.Errorf(ctx, "Error 35: %v", err)
-			return
-		}
-		docsToDelete := doc.Ref.Collection("2018").Documents(ctx)
-		for {
-			inner, err := docsToDelete.Next()
-			if err == iterator.Done {
-				break
-			}
-			if err != nil {
-				log.Errorf(ctx, "Error 45: %v", err)
-				return
-			}
-			if batchSize > 400 {
-				_, err := batch.Commit(ctx)
-				if err != nil {
-					return
-				}
-				batchSize = 0
-				batch = fbClient.Batch()
-			}
-			batchSize++
-			batch.Delete(inner.Ref)
-		}
-		docsToDelete = doc.Ref.Collection("courses").Documents(ctx)
-		for {
-			inner, err := docsToDelete.Next()
-			if err == iterator.Done {
-				break
-			}
-			if err != nil {
-				log.Errorf(ctx, "Error 66: %v", err)
-				return
-			}
-			if batchSize > 400 {
-				_, err := batch.Commit(ctx)
-				if err != nil {
-					return
-				}
-				batchSize = 0
-				batch = fbClient.Batch()
-			}
-			batchSize++
-			batch.Delete(inner.Ref)
-		}
-		docsToDelete = doc.Ref.Collection("courses_fall").Documents(ctx)
-		for {
-			inner, err := docsToDelete.Next()
-			if err == iterator.Done {
-				break
-			}
-			if err != nil {
-				log.Errorf(ctx, "Error 87: %v", err)
-				return
-			}
-			if batchSize > 400 {
-				_, err := batch.Commit(ctx)
-				if err != nil {
-					return
-				}
-				batchSize = 0
-				batch = fbClient.Batch()
-			}
-			batchSize++
-			batch.Delete(inner.Ref)
-		}
-		docsToDelete = doc.Ref.Collection("courses_spring").Documents(ctx)
-		for {
-			inner, err := docsToDelete.Next()
-			if err == iterator.Done {
-				break
-			}
-			if err != nil {
-				log.Errorf(ctx, "Error 108: %v", err)
-				return
-			}
-			if batchSize > 400 {
-				_, err := batch.Commit(ctx)
-				if err != nil {
-					return
-				}
-				batchSize = 0
-				batch = fbClient.Batch()
-			}
-			batchSize++
-			batch.Delete(inner.Ref)
-		}
-		docsToDelete = doc.Ref.Collection("courses_summer").Documents(ctx)
-		for {
-			inner, err := docsToDelete.Next()
-			if err == iterator.Done {
-				break
-			}
-			if err != nil {
-				log.Errorf(ctx, "Error 129: %v", err)
-				return
-			}
-			if batchSize > 400 {
-				_, err := batch.Commit(ctx)
-				if err != nil {
-					return
-				}
-				batchSize = 0
-				batch = fbClient.Batch()
-			}
-			batchSize++
-			batch.Delete(inner.Ref)
-		}
+	// Get the list of sections we are actively tracking
+	sectionsSnapshot := fbClient.Collection("tracked_sections").Documents(ctx)
 
+	// Actually get all the data within these docs
+	sectionDocuments, err := sectionsSnapshot.GetAll()
+	if err != nil {
+		log.Errorf(ctx, "Error getting tracked_sections! sec: %v", sectionDocuments)
+		log.Errorf(ctx, "Error getting tracked_sections! Err: %v", err)
+		w.WriteHeader(500)
+		return
 	}
+	log.Debugf(ctx, "successfully got sectionDocuments we are tracking")
+
+	fbBatch := fbClient.Batch()
+
+	for _, doc := range sectionDocuments {
+		data := doc.Data()
+
+		data["crn"] = doc.Ref.ID
+		fbBatch.Create(fbClient.Collection("sections_tracked").NewDoc(), data)
+	}
+
+	fbBatch.Commit(ctx)
 
 }

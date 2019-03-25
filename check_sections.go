@@ -21,11 +21,11 @@ func CheckSectionsHandler(w http.ResponseWriter, r *http.Request) {
 	log.Infof(ctx, "Context loaded. Starting execution.")
 
 	// Make sure the request is from the appengine cron
-	if r.Header.Get("X-Appengine-Cron") == "" {
-		log.Warningf(ctx, "Request is not from the cron. Exiting")
-		w.WriteHeader(403)
-		return
-	}
+	// if r.Header.Get("X-Appengine-Cron") == "" {
+	// 	log.Warningf(ctx, "Request is not from the cron. Exiting")
+	// 	w.WriteHeader(403)
+	// 	return
+	// }
 
 	fbClient := GetFirebaseClient(ctx)
 	if fbClient == nil {
@@ -35,13 +35,13 @@ func CheckSectionsHandler(w http.ResponseWriter, r *http.Request) {
 	defer fbClient.Close()
 
 	// Get the list of sections we are actively tracking
-	sectionsSnapshot := fbClient.Collection("tracked_sections").Documents(ctx)
+	sectionsSnapshot := fbClient.Collection("sections_tracked").Documents(ctx)
 
 	// Actually get all the data within these docs
 	sectionDocuments, err := sectionsSnapshot.GetAll()
 	if err != nil {
-		log.Errorf(ctx, "Error getting tracked_sections! sec: %v", sectionDocuments)
-		log.Errorf(ctx, "Error getting tracked_sections! Err: %v", err)
+		log.Errorf(ctx, "Error getting sections_tracked! sec: %v", sectionDocuments)
+		log.Errorf(ctx, "Error getting sections_tracked! Err: %v", err)
 		w.WriteHeader(500)
 		return
 	}
@@ -86,9 +86,9 @@ func CheckSectionsHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func sectionCheckWorker(ctx context.Context, jobs <-chan *firestore.DocumentSnapshot, returnChannel chan<- int, client *http.Client, fbClient *firestore.Client, fbBatch *firestore.WriteBatch) {
-
 	for doc := range jobs {
-
+		// The unique doc ID
+		sectionUID := doc.Ref.ID
 		// Get section data
 		sectionData := doc.Data()
 		if sectionData == nil {
@@ -120,7 +120,7 @@ func sectionCheckWorker(ctx context.Context, jobs <-chan *firestore.DocumentSnap
 			returnChannel <- 0
 			continue
 		}
-		crn := doc.Ref.ID
+		crn := sectionData["crn"].(string)
 
 		// Make a request to Atlas
 		resp, err := MakeAtlasSectionRequest(client, term, departmentAbbr, courseNumber)
@@ -165,6 +165,23 @@ func sectionCheckWorker(ctx context.Context, jobs <-chan *firestore.DocumentSnap
 			continue
 		}
 
+		users, ok := sectionData["users"].([]interface{})
+		if !ok {
+			log.Errorf(ctx, "couldn't parse userslice")
+			returnChannel <- 0
+			continue
+		}
+
+		if len(users) < 1 {
+			log.Infof(ctx, "CRN %s has %d users. Deleting CRN", crn, len(users))
+			err := MoveTrackedSection(ctx, fbClient, newSectionData[0].Crn, sectionUID, term)
+			if err != nil {
+				log.Errorf(ctx, "Failed to move the stale section data: %v", err)
+			}
+			returnChannel <- 0
+			continue
+		}
+		log.Infof(ctx, "seats available for %v:%v", crn, newSeatsAvailable)
 		// If there are seats available
 		if newSeatsAvailable > 0 {
 			users, ok := sectionData["users"].([]interface{})
@@ -174,16 +191,21 @@ func sectionCheckWorker(ctx context.Context, jobs <-chan *firestore.DocumentSnap
 				returnChannel <- 0
 				continue
 			}
+			log.Infof(ctx, "The CRN %s has %d open seats. Sending a message to %d users.", crn, newSeatsAvailable, len(users))
 			sendOpenSeatMessages(ctx, client, fbClient, users, newSectionData[0])
 			removeSectionFromUserData(ctx, fbClient, fbBatch, users, newSectionData[0].Crn)
-			fbBatch.Delete(fbClient.Collection("tracked_sections").Doc(crn))
+
+			err := MoveTrackedSection(ctx, fbClient, newSectionData[0].Crn, sectionUID, term)
+			if err != nil {
+				log.Errorf(ctx, "Failed to move the stale section data: %v", err)
+			}
 
 			returnChannel <- 0
 			continue
 		}
 
 		// If we get here, we just need to update the stored section model so it's all clean and nice
-		updateTrackedSection(ctx, fbBatch, fbClient.Collection("tracked_sections").Doc(newSectionData[0].Crn), newSectionData[0])
+		updateTrackedSection(ctx, fbBatch, fbClient.Collection("sections_tracked").Doc(sectionUID), newSectionData[0])
 
 		returnChannel <- 0
 	}
@@ -214,7 +236,7 @@ func removeSectionFromUserData(ctx context.Context, fbClient *firestore.Client, 
 		}
 		untypedUserdata := userDataMap["sections"]
 		if untypedUserdata == nil {
-			log.Warningf(ctx, "found legacy user with no tracked sections.")
+			log.Infof(ctx, "found user with no tracked sections on their userdata.")
 			continue
 		}
 		sectionSlice := untypedUserdata.([]interface{})
@@ -238,7 +260,7 @@ func sendOpenSeatMessages(ctx context.Context, client *http.Client, fbClient *fi
 	for _, user := range users {
 		number, err := LookupUserNumber(ctx, fbClient, user.(string))
 		if err != nil {
-
+			log.Errorf(ctx, "Unable to send a text to user %s", user.(string))
 		}
 		if userNumbers == "" {
 			userNumbers = number
