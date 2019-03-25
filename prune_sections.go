@@ -31,19 +31,19 @@ func PruneSectionsHandler(w http.ResponseWriter, r *http.Request) {
 	now := time.Now()
 	term := "00"
 	year := now.Year()
+	if now.Month() > 10 {
+		// If our current month is after October or greater, remove fall (year) and before
+		term = fmt.Sprintf("%d%d", year, 70)
 
-	if now.Month() > 8 {
+	} else if now.Month() > 8 {
 		// If our current month is September or greater, we should remove summer (year) and before
 		term = fmt.Sprintf("%d%d", year, 50)
 
-	} else if now.Month() > 4 {
-		// If our current month is after May or greater, remove spring (year) and before
+	} else if now.Month() > 3 {
+		// If our current month is April or greater, remove spring (year) and before
 		term = fmt.Sprintf("%d%d", year, 30)
-	} else if now.Month() > 0 {
-		// If our current month is after January or greater, remove fall (year-1) and before
-		term = fmt.Sprintf("%d%d", year-1, 70)
-
 	}
+
 	log.Infof(ctx, "Removing all trackedsections where term <= %s", term)
 	// Get the list of sections we are actively tracking
 	sectionsSnapshot := fbClient.Collection("sections_tracked").Where("term", "<=", term).Documents(ctx)
