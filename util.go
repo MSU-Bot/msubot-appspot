@@ -204,19 +204,80 @@ func GetFirebaseClient(ctx context.Context) *firestore.Client {
 	return fbClient
 }
 
-// LookupUserSections looks up the tracked sections of a user
-// func LookupUserSections(ctx context.Context, fbClient *firestore.Client, number string) ([]Section, error) {
-// 	userData, uid := FetchUserData(ctx, fbClient, number)
-// 	if userData == nil {
-// 		log.Warningf(ctx, "LookupUserSections: User not found in lookup")
-// 		return nil, nil
-// 	}
-// 	trackedCrns := userData["sections"].([]string)
-// 	var sectionList []Section
+// MoveTrackedSection moves old sections out of the prod area
+func MoveTrackedSection(ctx context.Context, fbClient *firestore.Client, crn, uid, term string) error {
 
-// 	for _, section := range trackedCrns {
-// 		sectionSnapshot, err := fbClient.Collection("sections").Doc(section).Get(ctx)
-// 		sectionData := sectionSnapshot.Data()
+	// Look for an existing archive doc to add userdata to
+	docArchiveIter := fbClient.Collection("sections_archive").Where("term", "==", term).Where("crn", "==", crn).Documents(ctx)
+	archiveDocs, err := docArchiveIter.GetAll()
 
-// 	}
-// }
+	if err != nil {
+		log.Errorf(ctx, "Could not get list of archive docs for uid %v: %v", uid, err)
+		return err
+	}
+
+	// Get the document that we need to move
+	docToMove, err := fbClient.Collection("sections_tracked").Doc(uid).Get(ctx)
+	docToMoveData := docToMove.Data()
+
+	if err != nil {
+		log.Errorf(ctx, "Could not get the new doc for uid %s : %v", uid, err)
+		return err
+	}
+
+	//  if there is a doc, merge with it rather than making a new one
+	if archiveDocs != nil {
+		if len(archiveDocs) > 1 {
+			log.Errorf(ctx, "Duplicate archiveDocs: %v", archiveDocs)
+		}
+
+		//  Get the data for the archive docs
+		data := archiveDocs[0].Data()
+
+		// get all the users
+		users, ok := data["users"].([]interface{})
+		if !ok {
+			log.Errorf(ctx, "couldn't parse userslice")
+			return nil
+		}
+
+		// get all the users
+		usersToAdd, ok := docToMoveData["users"].([]interface{})
+		if !ok {
+			log.Errorf(ctx, "couldn't parse userslice")
+			return nil
+		}
+
+		//  make a mega list
+		allUsers := append(users, usersToAdd...)
+
+		// Update that userlist
+		_, err := archiveDocs[0].Ref.Set(ctx, map[string]interface{}{
+			"users": allUsers,
+		}, firestore.MergeAll)
+		if err != nil {
+			log.Errorf(ctx, "Error appending users to archive")
+			return err
+		}
+
+	} else {
+
+		// Add a new doc
+		_, _, err := fbClient.Collection("sections_archive").Add(ctx, docToMoveData)
+		if err != nil {
+			log.Errorf(ctx, "Error creating a new archived doc")
+			return err
+		}
+
+	}
+
+	//  Finally delete the old one
+	_, err = docToMove.Ref.Delete(ctx)
+	if err != nil {
+		log.Errorf(ctx, "Error deleting old document")
+		return err
+	}
+
+	return nil
+
+}

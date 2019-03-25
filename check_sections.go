@@ -20,7 +20,7 @@ func CheckSectionsHandler(w http.ResponseWriter, r *http.Request) {
 	client := urlfetch.Client(ctx)
 	log.Infof(ctx, "Context loaded. Starting execution.")
 
-	// // Make sure the request is from the appengine cron
+	// Make sure the request is from the appengine cron
 	// if r.Header.Get("X-Appengine-Cron") == "" {
 	// 	log.Warningf(ctx, "Request is not from the cron. Exiting")
 	// 	w.WriteHeader(403)
@@ -86,7 +86,6 @@ func CheckSectionsHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func sectionCheckWorker(ctx context.Context, jobs <-chan *firestore.DocumentSnapshot, returnChannel chan<- int, client *http.Client, fbClient *firestore.Client, fbBatch *firestore.WriteBatch) {
-
 	for doc := range jobs {
 		// The unique doc ID
 		sectionUID := doc.Ref.ID
@@ -175,7 +174,10 @@ func sectionCheckWorker(ctx context.Context, jobs <-chan *firestore.DocumentSnap
 
 		if len(users) < 1 {
 			log.Infof(ctx, "CRN %s has %d users. Deleting CRN", crn, len(users))
-			fbBatch.Delete(fbClient.Collection("sections_tracked").Doc(sectionUID))
+			err := MoveTrackedSection(ctx, fbClient, newSectionData[0].Crn, sectionUID, term)
+			if err != nil {
+				log.Errorf(ctx, "Failed to move the stale section data: %v", err)
+			}
 			returnChannel <- 0
 			continue
 		}
@@ -192,7 +194,11 @@ func sectionCheckWorker(ctx context.Context, jobs <-chan *firestore.DocumentSnap
 			log.Infof(ctx, "The CRN %s has %d open seats. Sending a message to %d users.", crn, newSeatsAvailable, len(users))
 			sendOpenSeatMessages(ctx, client, fbClient, users, newSectionData[0])
 			removeSectionFromUserData(ctx, fbClient, fbBatch, users, newSectionData[0].Crn)
-			fbBatch.Delete(fbClient.Collection("sections_tracked").Doc(sectionUID))
+
+			err := MoveTrackedSection(ctx, fbClient, newSectionData[0].Crn, sectionUID, term)
+			if err != nil {
+				log.Errorf(ctx, "Failed to move the stale section data: %v", err)
+			}
 
 			returnChannel <- 0
 			continue
