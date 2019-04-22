@@ -43,7 +43,7 @@ func MakeAtlasSectionRequest(client *http.Client, term, dept, course string) (*h
 		dept,
 		course)
 
-	req, err := http.NewRequest("POST", "https://atlas.montana.edu:9000/pls/bzagent/bzskcrse.PW_ListSchClassSimple", strings.NewReader(body))
+	req, err := http.NewRequest("POST", "https://prodmyinfo.montana.edu/pls/bzagent/bzskcrse.PW_ListSchClassSimple", strings.NewReader(body))
 	defer req.Body.Close()
 	if err != nil {
 		return nil, err

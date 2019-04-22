@@ -17,7 +17,7 @@ func HealthcheckHandler(w http.ResponseWriter, r *http.Request) {
 	log.Infof(ctx, "Context loaded. Starting execution.")
 
 	beforeReq := time.Now()
-	_, err := client.Get("https://atlas.montana.edu:9000/pls/bzagent/bzskcrse.PW_SelSchClass")
+	_, err := client.Get("https://prodmyinfo.montana.edu/pls/bzagent/bzskcrse.PW_SelSchClass")
 	totalReqTime := time.Since(beforeReq)
 	if err != nil {
 		log.Errorf(ctx, "Atlas Appears to be down?")
