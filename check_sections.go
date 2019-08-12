@@ -150,7 +150,7 @@ func sectionCheckWorker(ctx context.Context, jobs <-chan *firestore.DocumentSnap
 		// If we didn't get back any, warn us and move on.
 		// This typically occurs when Banner is down
 		if len(newSectionData) == 0 {
-			log.Warningf(ctx, "Couldn't find section from MSU")
+			log.Infof(ctx, "Couldn't find section from MSU: %v", crn)
 
 			returnChannel <- 0
 			continue
