@@ -1,13 +1,22 @@
 package main
 
 import (
+	"fmt"
+	"log"
 	"net/http"
-	// _ "net/http/pprof"
-
-	"google.golang.org/appengine" // Required external App Engine library
+	"os"
 )
 
 func main() {
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+		log.Printf("Defaulting to port %s", port)
+	}
+
+	log.Printf("Listening on port %s", port)
+	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%s", port), nil))
+
 	http.HandleFunc("/sections", ScrapeSectionHandler)
 	http.HandleFunc("/welcomeuser", WelcomeUserHandler)
 	http.HandleFunc("/checktrackedsections", CheckSectionsHandler)
@@ -15,5 +24,5 @@ func main() {
 	http.HandleFunc("/DatabaseCleanup", DatabaseCleanupHandler)
 	http.HandleFunc("/receivemessage", ReceiveMessageHandler)
 	http.HandleFunc("/healthcheck", HealthcheckHandler)
-	appengine.Main() // Starts the server to receive requests
+	http.HandleFunc("/addusertosection", AddUserToSectionHandler)
 }

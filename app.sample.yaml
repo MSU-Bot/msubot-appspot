@@ -1,5 +1,4 @@
-runtime: go
-api_version: go1
+runtime: go112
 env_variables:
   FIREBASE_PROJECT: "Project_here"
   DATADOG_API_KEY: 'datadog_key'
