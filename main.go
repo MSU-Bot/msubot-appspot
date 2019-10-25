@@ -1,7 +1,9 @@
 package main
 
 import (
+	"log"
 	"net/http"
+
 	// _ "net/http/pprof"
 
 	"google.golang.org/appengine" // Required external App Engine library
@@ -15,5 +17,6 @@ func main() {
 	http.HandleFunc("/DatabaseCleanup", DatabaseCleanupHandler)
 	http.HandleFunc("/receivemessage", ReceiveMessageHandler)
 	http.HandleFunc("/healthcheck", HealthcheckHandler)
+	log.Printf("Starting the server...")
 	appengine.Main() // Starts the server to receive requests
 }
