@@ -1,19 +1,18 @@
-package main
+package server
 
 import (
 	"fmt"
 	"net/http"
 	"time"
 
-	"google.golang.org/appengine"
-	"google.golang.org/appengine/log"
+	log "github.com/sirupsen/logrus"
 )
 
 // PruneSectionsHandler is run daily to clean up expired course checkers from old semesters.
 func PruneSectionsHandler(w http.ResponseWriter, r *http.Request) {
 
-	ctx := appengine.NewContext(r)
-	log.Infof(ctx, "Context loaded. Starting execution.")
+	ctx := r.Context()
+	log.WithContext(ctx).Infof("Context loaded. Starting execution.")
 
 	// if r.Header.Get("X-Appengine-Cron") == "" {
 	// 	log.Warningf(ctx, "Request is not from the cron! Exiting")
@@ -44,39 +43,39 @@ func PruneSectionsHandler(w http.ResponseWriter, r *http.Request) {
 		term = fmt.Sprintf("%d%d", year, 30)
 	}
 
-	log.Infof(ctx, "Removing all trackedsections where term <= %s", term)
+	log.WithContext(ctx).Infof("Removing all trackedsections where term <= %s", term)
 	// Get the list of sections we are actively tracking
 	sectionsSnapshot := fbClient.Collection("sections_tracked").Where("term", "<=", term).Documents(ctx)
 
 	expiredSectionDocs, err := sectionsSnapshot.GetAll()
 	if err != nil {
-		log.Errorf(ctx, "Unable to retrieve expired sections!")
+		log.WithContext(ctx).Errorf("Unable to retrieve expired sections!")
 		w.WriteHeader(500)
 		return
 	}
 
-	log.Infof(ctx, "Number of expired courses: %d", len(expiredSectionDocs))
+	log.WithContext(ctx).Infof("Number of expired courses: %d", len(expiredSectionDocs))
 	for _, doc := range expiredSectionDocs {
 		data := doc.Data()
 
 		// Type conversions
 		term, ok := data["term"].(string)
 		if !ok {
-			log.Errorf(ctx, "type conv failed for courseNumber. Could not prune %s", doc.Ref.ID)
+			log.WithContext(ctx).Errorf("type conv failed for courseNumber. Could not prune %s", doc.Ref.ID)
 			continue
 		}
 		// Type conversions
 		crn, ok := data["crn"].(string)
 		if !ok {
-			log.Errorf(ctx, "type conv failed for crn. Could not prune %s", doc.Ref.ID)
+			log.WithContext(ctx).Errorf("type conv failed for crn. Could not prune %s", doc.Ref.ID)
 			continue
 		}
 
-		log.Debugf(ctx, "Moving Expired doc with uid %s because term was %v ", doc.Ref.ID, data["term"])
+		log.WithContext(ctx).Infof("Moving Expired doc with uid %s because term was %v ", doc.Ref.ID, data["term"])
 
 		err := MoveTrackedSection(ctx, fbClient, crn, doc.Ref.ID, term)
 		if err != nil {
-			log.Errorf(ctx, "Unable to move doc with UID: %s", doc.Ref.ID)
+			log.WithContext(ctx).Errorf("Unable to move doc with UID: %s", doc.Ref.ID)
 		}
 	}
 }

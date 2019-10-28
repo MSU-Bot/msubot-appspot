@@ -1,22 +1,21 @@
-package main
+package server
 
 import (
 	"net/http"
 
-	"google.golang.org/appengine"
-	"google.golang.org/appengine/log"
+	log "github.com/sirupsen/logrus"
 )
 
 // DatabaseCleanupHandler is awesome
 func DatabaseCleanupHandler(w http.ResponseWriter, r *http.Request) {
 	return
 	// Load up a context and http client
-	ctx := appengine.NewContext(r)
-	log.Infof(ctx, "Context loaded. Starting execution.")
+	ctx := r.Context()
+	log.WithContext(ctx).Infof("Context loaded. Starting execution.")
 
 	// // Make sure the request is from the appengine cron
 	// if r.Header.Get("X-Appengine-Cron") == "" {
-	// 	log.Warningf(ctx, "Request is not from the cron. Exiting")
+	// 	log.WithContext(ctx).Warningf("Request is not from the cron. Exiting")
 	// 	w.WriteHeader(403)
 	// 	return
 	// }
@@ -34,12 +33,12 @@ func DatabaseCleanupHandler(w http.ResponseWriter, r *http.Request) {
 	// Actually get all the data within these docs
 	sectionDocuments, err := sectionsSnapshot.GetAll()
 	if err != nil {
-		log.Errorf(ctx, "Error getting tracked_sections! sec: %v", sectionDocuments)
-		log.Errorf(ctx, "Error getting tracked_sections! Err: %v", err)
+		log.WithContext(ctx).Errorf("Error getting tracked_sections! sec: %v", sectionDocuments)
+		log.WithContext(ctx).Errorf("Error getting tracked_sections! Err: %v", err)
 		w.WriteHeader(500)
 		return
 	}
-	log.Debugf(ctx, "successfully got sectionDocuments we are tracking")
+	log.WithContext(ctx).Debugf("successfully got sectionDocuments we are tracking")
 
 	fbBatch := fbClient.Batch()
 

@@ -1,4 +1,4 @@
-package main
+package server
 
 import (
 	"fmt"
@@ -7,14 +7,13 @@ import (
 
 	"github.com/plivo/plivo-go/xml"
 
-	"google.golang.org/appengine"
-	"google.golang.org/appengine/log"
+	log "github.com/sirupsen/logrus"
 )
 
 // ReceiveMessageHandler handles ingest of SMS messages from plivo
 func ReceiveMessageHandler(w http.ResponseWriter, r *http.Request) {
-	ctx := appengine.NewContext(r)
-	log.Infof(ctx, "Context loaded. Starting execution.")
+	ctx := r.Context()
+	log.WithContext(ctx).Infof("Context loaded. Starting execution.")
 
 	if err := r.ParseForm(); err != nil {
 		http.Error(w, "Could not parse form", http.StatusBadRequest)
@@ -31,12 +30,12 @@ func ReceiveMessageHandler(w http.ResponseWriter, r *http.Request) {
 
 		_, uid := FetchUserDataWithNumber(ctx, fbClient, from)
 
-		log.Infof(ctx, "Found user with UID: %s", uid)
+		log.WithContext(ctx).Infof("Found user with UID: %s", uid)
 
 		if uid != "" {
 			trackedDocs, err := fbClient.Collection("sections_tracked").Where("users", "array-contains", uid).Documents(ctx).GetAll()
 			if err != nil {
-				log.Errorf(ctx, "Could not retrieve tracked docs for the user: %s Err: %v", uid, err)
+				log.WithContext(ctx).WithError(err).Errorf("Could not retrieve tracked docs for the user: %s", uid)
 				responseText = "An error occurred, and we couldn't retrieve the course list. Please try again later."
 			} else {
 				if len(trackedDocs) == 0 {
