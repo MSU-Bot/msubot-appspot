@@ -1,4 +1,4 @@
-package main
+package server
 
 import (
 	"bytes"
@@ -12,7 +12,7 @@ import (
 
 	"cloud.google.com/go/firestore"
 	"github.com/PuerkitoBio/goquery"
-	"google.golang.org/appengine/log"
+	log "github.com/sirupsen/logrus"
 )
 
 // Section is a section model
@@ -164,7 +164,7 @@ func FetchUserDataWithNumber(ctx context.Context, fbClient *firestore.Client, nu
 
 	parsed, err := docs.GetAll()
 	if err != nil {
-		log.Criticalf(ctx, "DoesUserExist: %v", err)
+		log.WithContext(ctx).WithError(err).Errorf("DoesUserExist Error")
 		panic(err)
 	}
 	if len(parsed) > 0 {
@@ -179,7 +179,7 @@ func FetchUserDataWithNumber(ctx context.Context, fbClient *firestore.Client, nu
 func LookupUserNumber(ctx context.Context, fbClient *firestore.Client, uid string) (string, error) {
 	doc, err := fbClient.Collection("users").Doc(uid).Get(ctx)
 	if err != nil {
-		log.Errorf(ctx, "Tracked user not found. This should've been cleaned up. Error: %v", err)
+		log.WithContext(ctx).WithError(err).Errorf("Tracked user not found. This should've been cleaned up")
 		return "", err
 	}
 	return doc.Data()["number"].(string), nil
@@ -188,18 +188,18 @@ func LookupUserNumber(ctx context.Context, fbClient *firestore.Client, uid strin
 // GetFirebaseClient creates and returns a new firebase client, used to interact with the database
 func GetFirebaseClient(ctx context.Context) *firestore.Client {
 	firebasePID := os.Getenv("FIREBASE_PROJECT")
-	log.Debugf(ctx, "Loaded firebase project ID.")
+	log.WithContext(ctx).Infof("Loaded firebase project ID.")
 	if firebasePID == "" {
-		log.Criticalf(ctx, "Firebase Project ID is nil, I cannot continue.")
+		log.WithContext(ctx).Errorf("Firebase Project ID is nil, I cannot continue.")
 		panic("Firebase Project ID is nil")
 	}
 
 	fbClient, err := firestore.NewClient(ctx, firebasePID)
 	if err != nil {
-		log.Errorf(ctx, "Could not create new client for Firebase %v", err)
+		log.WithContext(ctx).WithError(err).Errorf("Could not create new client for Firebase")
 		return nil
 	}
-	log.Debugf(ctx, "successfully opened firestore client")
+	log.WithContext(ctx).Infof("successfully opened firestore client")
 
 	return fbClient
 }
@@ -212,7 +212,7 @@ func MoveTrackedSection(ctx context.Context, fbClient *firestore.Client, crn, ui
 	archiveDocs, err := docArchiveIter.GetAll()
 
 	if err != nil {
-		log.Errorf(ctx, "Could not get list of archive docs for uid %v: %v", uid, err)
+		log.WithContext(ctx).WithError(err).Errorf("Could not get list of archive docs for uid %v: %v", uid, err)
 		return err
 	}
 
@@ -221,14 +221,14 @@ func MoveTrackedSection(ctx context.Context, fbClient *firestore.Client, crn, ui
 	docToMoveData := docToMove.Data()
 
 	if err != nil {
-		log.Errorf(ctx, "Could not get the new doc for uid %s : %v", uid, err)
+		log.WithContext(ctx).WithError(err).Errorf("Could not get the new doc for uid %s : %v", uid, err)
 		return err
 	}
 
 	//  if there is a doc, merge with it rather than making a new one
 	if archiveDocs != nil {
 		if len(archiveDocs) > 1 {
-			log.Errorf(ctx, "Duplicate archiveDocs: %v", archiveDocs)
+			log.WithContext(ctx).WithError(err).Errorf("Duplicate archiveDocs: %v", archiveDocs)
 		}
 
 		//  Get the data for the archive docs
@@ -237,14 +237,14 @@ func MoveTrackedSection(ctx context.Context, fbClient *firestore.Client, crn, ui
 		// get all the users
 		users, ok := data["users"].([]interface{})
 		if !ok {
-			log.Errorf(ctx, "couldn't parse userslice")
+			log.WithContext(ctx).WithError(err).Errorf("couldn't parse userslice")
 			return nil
 		}
 
 		// get all the users
 		usersToAdd, ok := docToMoveData["users"].([]interface{})
 		if !ok {
-			log.Errorf(ctx, "couldn't parse userslice")
+			log.WithContext(ctx).WithError(err).Errorf("couldn't parse userslice")
 			return nil
 		}
 
@@ -256,7 +256,7 @@ func MoveTrackedSection(ctx context.Context, fbClient *firestore.Client, crn, ui
 			"users": allUsers,
 		}, firestore.MergeAll)
 		if err != nil {
-			log.Errorf(ctx, "Error appending users to archive")
+			log.WithContext(ctx).WithError(err).Errorf("Error appending users to archive")
 			return err
 		}
 
@@ -265,7 +265,7 @@ func MoveTrackedSection(ctx context.Context, fbClient *firestore.Client, crn, ui
 		// Add a new doc
 		_, _, err := fbClient.Collection("sections_archive").Add(ctx, docToMoveData)
 		if err != nil {
-			log.Errorf(ctx, "Error creating a new archived doc")
+			log.WithContext(ctx).WithError(err).Errorf("Error creating a new archived doc")
 			return err
 		}
 
@@ -274,7 +274,7 @@ func MoveTrackedSection(ctx context.Context, fbClient *firestore.Client, crn, ui
 	//  Finally delete the old one
 	_, err = docToMove.Ref.Delete(ctx)
 	if err != nil {
-		log.Errorf(ctx, "Error deleting old document")
+		log.WithContext(ctx).WithError(err).Errorf("Error deleting old document")
 		return err
 	}
 

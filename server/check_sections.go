@@ -1,4 +1,4 @@
-package main
+package server
 
 import (
 	"context"
@@ -6,19 +6,19 @@ import (
 	"net/http"
 	"strconv"
 
+	log "github.com/sirupsen/logrus"
+
 	"cloud.google.com/go/firestore"
-	"google.golang.org/appengine"
-	"google.golang.org/appengine/log"
-	"google.golang.org/appengine/urlfetch"
 )
 
 // CheckSectionsHandler runs often to check for open seats
 func CheckSectionsHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Load up a context and http client
-	ctx := appengine.NewContext(r)
-	client := urlfetch.Client(ctx)
-	log.Infof(ctx, "Context loaded. Starting execution.")
+	ctx := r.Context()
+	client := http.DefaultClient
+
+	log.WithContext(ctx).Infof("Context loaded. Starting execution.")
 
 	// Make sure the request is from the appengine cron
 	// if r.Header.Get("X-Appengine-Cron") == "" {
@@ -40,12 +40,12 @@ func CheckSectionsHandler(w http.ResponseWriter, r *http.Request) {
 	// Actually get all the data within these docs
 	sectionDocuments, err := sectionsSnapshot.GetAll()
 	if err != nil {
-		log.Errorf(ctx, "Error getting sections_tracked! sec: %v", sectionDocuments)
-		log.Errorf(ctx, "Error getting sections_tracked! Err: %v", err)
+		log.WithContext(ctx).Errorf("Error getting sections_tracked! sec: %v", sectionDocuments)
+		log.WithContext(ctx).Errorf("Error getting sections_tracked! Err: %v", err)
 		w.WriteHeader(500)
 		return
 	}
-	log.Debugf(ctx, "successfully got sectionDocuments we are tracking")
+	log.WithContext(ctx).Infof("successfully got sectionDocuments we are tracking")
 
 	fbBatch := fbClient.Batch()
 
@@ -77,7 +77,7 @@ func CheckSectionsHandler(w http.ResponseWriter, r *http.Request) {
 
 	_, err = fbBatch.Commit(ctx)
 	if err != nil {
-		log.Criticalf(ctx, "Writebatch failed: %v", err)
+		log.WithContext(ctx).Errorf("Writebatch failed: %v", err)
 	}
 	w.WriteHeader(200)
 
@@ -92,7 +92,7 @@ func sectionCheckWorker(ctx context.Context, jobs <-chan *firestore.DocumentSnap
 		// Get section data
 		sectionData := doc.Data()
 		if sectionData == nil {
-			log.Errorf(ctx, "unexpected error with getting data for course")
+			log.WithContext(ctx).Errorf("unexpected error with getting data for course")
 
 			returnChannel <- 0
 			continue
@@ -101,21 +101,21 @@ func sectionCheckWorker(ctx context.Context, jobs <-chan *firestore.DocumentSnap
 		// Type conversions
 		term, ok := sectionData["term"].(string)
 		if !ok {
-			log.Errorf(ctx, "type conv failed for courseNumber")
+			log.WithContext(ctx).Errorf("type conv failed for courseNumber")
 
 			returnChannel <- 0
 			continue
 		}
 		departmentAbbr, ok := sectionData["departmentAbbr"].(string)
 		if !ok {
-			log.Errorf(ctx, "type conv failed for courseNumber")
+			log.WithContext(ctx).Errorf("type conv failed for courseNumber")
 
 			returnChannel <- 0
 			continue
 		}
 		courseNumber, ok := sectionData["courseNumber"].(string)
 		if !ok {
-			log.Errorf(ctx, "type conv failed for courseNumber")
+			log.WithContext(ctx).Errorf("type conv failed for courseNumber")
 
 			returnChannel <- 0
 			continue
@@ -125,7 +125,7 @@ func sectionCheckWorker(ctx context.Context, jobs <-chan *firestore.DocumentSnap
 		// Make a request to Atlas
 		resp, err := MakeAtlasSectionRequest(client, term, departmentAbbr, courseNumber)
 		if err != nil {
-			log.Errorf(ctx, "Making Atlas request failed for %v: %v", departmentAbbr+courseNumber, err)
+			log.WithContext(ctx).Errorf("Making Atlas request failed for %v: %v", departmentAbbr+courseNumber, err)
 
 			returnChannel <- 0
 			continue
@@ -134,14 +134,14 @@ func sectionCheckWorker(ctx context.Context, jobs <-chan *firestore.DocumentSnap
 		// Parse into a section struct
 		newSectionData, err := ParseSectionResponse(resp, crn)
 		if err != nil {
-			log.Errorf(ctx, "Parsing section failed: %v", err)
+			log.WithContext(ctx).Errorf("Parsing section failed: %v", err)
 
 			returnChannel <- 0
 			continue
 		}
 		// If we somehow get back more than one section, something super borked earlier
 		if len(newSectionData) > 1 {
-			log.Errorf(ctx, "Something went wrong with parsing the section response. Expected 1 section, recieved %v", len(newSectionData))
+			log.WithContext(ctx).Errorf("Something went wrong with parsing the section response. Expected 1 section, recieved %v", len(newSectionData))
 
 			returnChannel <- 0
 			continue
@@ -150,7 +150,7 @@ func sectionCheckWorker(ctx context.Context, jobs <-chan *firestore.DocumentSnap
 		// If we didn't get back any, warn us and move on.
 		// This typically occurs when Banner is down
 		if len(newSectionData) == 0 {
-			log.Infof(ctx, "Couldn't find section from MSU: %v", crn)
+			log.WithContext(ctx).Infof("Couldn't find section from MSU: %v", crn)
 
 			returnChannel <- 0
 			continue
@@ -159,7 +159,7 @@ func sectionCheckWorker(ctx context.Context, jobs <-chan *firestore.DocumentSnap
 		// Parse the new available seats to an int
 		newSeatsAvailable, err := strconv.Atoi(newSectionData[0].AvailableSeats)
 		if err != nil {
-			log.Errorf(ctx, "couldn't parse newSeatsAvailable: %v", err)
+			log.WithContext(ctx).Errorf("couldn't parse newSeatsAvailable: %v", err)
 
 			returnChannel <- 0
 			continue
@@ -167,37 +167,37 @@ func sectionCheckWorker(ctx context.Context, jobs <-chan *firestore.DocumentSnap
 
 		users, ok := sectionData["users"].([]interface{})
 		if !ok {
-			log.Errorf(ctx, "couldn't parse userslice")
+			log.WithContext(ctx).Errorf("couldn't parse userslice")
 			returnChannel <- 0
 			continue
 		}
 
 		if len(users) < 1 {
-			log.Infof(ctx, "CRN %s has %d users. Deleting CRN", crn, len(users))
+			log.WithContext(ctx).Infof("CRN %s has %d users. Deleting CRN", crn, len(users))
 			err := MoveTrackedSection(ctx, fbClient, newSectionData[0].Crn, sectionUID, term)
 			if err != nil {
-				log.Errorf(ctx, "Failed to move the stale section data: %v", err)
+				log.WithContext(ctx).Errorf("Failed to move the stale section data: %v", err)
 			}
 			returnChannel <- 0
 			continue
 		}
-		log.Infof(ctx, "seats available for %v:%v", crn, newSeatsAvailable)
+		log.WithContext(ctx).Infof("seats available for %v:%v", crn, newSeatsAvailable)
 		// If there are seats available
 		if newSeatsAvailable > 0 {
 			users, ok := sectionData["users"].([]interface{})
 			if !ok {
-				log.Errorf(ctx, "couldn't parse userslice")
+				log.WithContext(ctx).Errorf("couldn't parse userslice")
 
 				returnChannel <- 0
 				continue
 			}
-			log.Infof(ctx, "The CRN %s has %d open seats. Sending a message to %d users.", crn, newSeatsAvailable, len(users))
+			log.WithContext(ctx).Infof("The CRN %s has %d open seats. Sending a message to %d users.", crn, newSeatsAvailable, len(users))
 			sendOpenSeatMessages(ctx, client, fbClient, users, newSectionData[0])
 			removeSectionFromUserData(ctx, fbClient, fbBatch, users, newSectionData[0].Crn)
 
 			err := MoveTrackedSection(ctx, fbClient, newSectionData[0].Crn, sectionUID, term)
 			if err != nil {
-				log.Errorf(ctx, "Failed to move the stale section data: %v", err)
+				log.WithContext(ctx).Errorf("Failed to move the stale section data: %v", err)
 			}
 
 			returnChannel <- 0
@@ -227,7 +227,7 @@ func removeSectionFromUserData(ctx context.Context, fbClient *firestore.Client, 
 
 		userData, err := fbClient.Collection("users").Doc(user.(string)).Get(ctx)
 		if err != nil {
-			log.Errorf(ctx, "couldn't find user when trying to remove crn ref")
+			log.WithContext(ctx).Errorf("couldn't find user when trying to remove crn ref")
 			continue
 		}
 		userDataMap := userData.Data()
@@ -236,7 +236,7 @@ func removeSectionFromUserData(ctx context.Context, fbClient *firestore.Client, 
 		}
 		untypedUserdata := userDataMap["sections"]
 		if untypedUserdata == nil {
-			log.Infof(ctx, "found user with no tracked sections on their userdata.")
+			log.WithContext(ctx).Infof("found user with no tracked sections on their userdata.")
 			continue
 		}
 		sectionSlice := untypedUserdata.([]interface{})
@@ -260,7 +260,7 @@ func sendOpenSeatMessages(ctx context.Context, client *http.Client, fbClient *fi
 	for _, user := range users {
 		number, err := LookupUserNumber(ctx, fbClient, user.(string))
 		if err != nil {
-			log.Errorf(ctx, "Unable to send a text to user %s", user.(string))
+			log.WithContext(ctx).Errorf("Unable to send a text to user %s", user.(string))
 		}
 		if userNumbers == "" {
 			userNumbers = number
@@ -270,9 +270,9 @@ func sendOpenSeatMessages(ctx context.Context, client *http.Client, fbClient *fi
 	}
 	resp, err := SendText(client, userNumbers, message)
 	if err != nil {
-		log.Errorf(ctx, "error sending text: %v", err)
+		log.WithContext(ctx).Errorf("error sending text: %v", err)
 		return err
 	}
-	log.Debugf(ctx, "%v", resp)
+	log.WithContext(ctx).Infof("%v", resp)
 	return nil
 }

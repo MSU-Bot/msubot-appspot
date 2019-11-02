@@ -1,4 +1,4 @@
-package main
+package server
 
 import (
 	"encoding/json"
@@ -6,17 +6,15 @@ import (
 	"net/http"
 	"time"
 
-	"google.golang.org/appengine" // Required external App Engine library
-	"google.golang.org/appengine/log"
-	"google.golang.org/appengine/urlfetch"
+	log "github.com/sirupsen/logrus"
 )
 
 // ScrapeSectionHandler scrapes
 func ScrapeSectionHandler(w http.ResponseWriter, r *http.Request) {
 
-	ctx := appengine.NewContext(r)
-	client := urlfetch.Client(ctx)
-	log.Infof(ctx, "Context loaded. Starting execution.")
+	ctx := r.Context()
+	client := http.DefaultClient
+	log.WithContext(ctx).Infof("Context loaded. Starting execution.")
 
 	queryString := r.URL.Query()
 	course := queryString["course"]
@@ -24,18 +22,18 @@ func ScrapeSectionHandler(w http.ResponseWriter, r *http.Request) {
 	term := queryString["term"]
 
 	if len(course) == 0 || len(dept) == 0 || len(term) == 0 {
-		log.Errorf(ctx, "Malformed request to API")
+		log.WithContext(ctx).Errorf("Malformed request to API")
 		http.Error(w, "bad syntax. Missing params!", http.StatusBadRequest)
 		return
 	}
-	log.Debugf(ctx, "term: %v", term)
-	log.Debugf(ctx, "dept: %v", dept)
-	log.Debugf(ctx, "course: %v", course)
+	log.WithContext(ctx).Debugf("term: %v", term)
+	log.WithContext(ctx).Debugf("dept: %v", dept)
+	log.WithContext(ctx).Debugf("course: %v", course)
 
 	response, err := MakeAtlasSectionRequest(client, term[0], dept[0], course[0])
 
 	if err != nil {
-		log.Errorf(ctx, "Request to myInfo failed with error: %v", err)
+		log.WithContext(ctx).Errorf("Request to myInfo failed with error: %v", err)
 		errorStr := fmt.Sprintf("Request to myInfo failed with error: %v", err)
 		http.Error(w, errorStr, http.StatusInternalServerError)
 		return
@@ -46,10 +44,10 @@ func ScrapeSectionHandler(w http.ResponseWriter, r *http.Request) {
 	sections, err := ParseSectionResponse(response, "")
 
 	elapsed := time.Since(start)
-	log.Infof(ctx, "Scrape time: %v", elapsed.String())
+	log.WithContext(ctx).Infof("Scrape time: %v", elapsed.String())
 
 	if err != nil {
-		log.Criticalf(ctx, "Course Scrape Failed with error: %v", err)
+		log.WithError(err).WithContext(ctx).Errorf("Course Scrape Failed")
 		errorStr := fmt.Sprintf("Course Scrape Failed with error: %v", err)
 		http.Error(w, errorStr, http.StatusInternalServerError)
 		return
