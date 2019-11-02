@@ -16,7 +16,7 @@ func main() {
 	http.HandleFunc("/welcomeuser", server.WelcomeUserHandler)
 	http.HandleFunc("/checktrackedsections", server.CheckSectionsHandler)
 	http.HandleFunc("/prunesections", server.PruneSectionsHandler)
-	http.HandleFunc("/DatabaseCleanup", server.DatabaseCleanupHandler)
+	// http.HandleFunc("/DatabaseCleanup", server.DatabaseCleanupHandler)
 	http.HandleFunc("/receivemessage", server.ReceiveMessageHandler)
 	http.HandleFunc("/healthcheck", server.HealthcheckHandler)
 

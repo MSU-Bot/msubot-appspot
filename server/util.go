@@ -10,8 +10,6 @@ import (
 	"regexp"
 	"strings"
 
-	"google.golang.org/api/option"
-
 	"cloud.google.com/go/firestore"
 	"github.com/PuerkitoBio/goquery"
 	log "github.com/sirupsen/logrus"
@@ -196,7 +194,7 @@ func GetFirebaseClient(ctx context.Context) *firestore.Client {
 		panic("Firebase Project ID is nil")
 	}
 
-	fbClient, err := firestore.NewClient(ctx, firebasePID, option.ClientOption{})
+	fbClient, err := firestore.NewClient(ctx, firebasePID)
 	if err != nil {
 		log.WithContext(ctx).WithError(err).Errorf("Could not create new client for Firebase")
 		return nil
