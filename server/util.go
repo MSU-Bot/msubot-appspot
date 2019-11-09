@@ -10,40 +10,21 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/SpencerCornish/msubot-appspot/server/constants"
+
 	"cloud.google.com/go/firestore"
 	"github.com/PuerkitoBio/goquery"
 	log "github.com/sirupsen/logrus"
 )
 
-// Section is a section model
-type Section struct {
-	DeptAbbr string
-	DeptName string
-
-	CourseName   string
-	CourseNumber string
-	CourseType   string
-	Credits      string
-
-	Instructor string
-	Time       string
-	Location   string
-
-	SectionNumber  string
-	Crn            string
-	TotalSeats     string
-	TakenSeats     string
-	AvailableSeats string
-}
-
 // MakeAtlasSectionRequest makes a request to Atlas for section data in the term, department, and course
 func MakeAtlasSectionRequest(client *http.Client, term, dept, course string) (*http.Response, error) {
-	body := fmt.Sprintf("sel_subj=dummy&bl_online=FALSE&sel_day=dummy&term=%v&sel_subj=%v&sel_inst=ANY&sel_online=&sel_crse=%v&begin_hh=0&begin_mi=0&end_hh=0&end_mi=0",
+	body := fmt.Sprintf(constants.AtlasPostFormatString,
 		term,
 		dept,
 		course)
 
-	req, err := http.NewRequest("POST", "https://prodmyinfo.montana.edu/pls/bzagent/bzskcrse.PW_ListSchClassSimple", strings.NewReader(body))
+	req, err := http.NewRequest("POST", constants.AtlasSectionURL, strings.NewReader(body))
 	defer req.Body.Close()
 	if err != nil {
 		return nil, err
@@ -58,8 +39,8 @@ func MakeAtlasSectionRequest(client *http.Client, term, dept, course string) (*h
 }
 
 // ParseSectionResponse turns the http.Response into a slice of sections
-func ParseSectionResponse(response *http.Response, crnToFind string) ([]Section, error) {
-	sections := []Section{}
+func ParseSectionResponse(response *http.Response, crnToFind string) ([]constants.Section, error) {
+	sections := []constants.Section{}
 	doc, err := goquery.NewDocumentFromReader(response.Body)
 	if err != nil {
 		return nil, err
@@ -77,7 +58,7 @@ func ParseSectionResponse(response *http.Response, crnToFind string) ([]Section,
 				panic("regex didn't work. Did the data model change?")
 			}
 
-			newSection := Section{
+			newSection := constants.Section{
 				DeptAbbr:       matches[0],
 				CourseNumber:   matches[1],
 				SectionNumber:  matches[2],
@@ -118,23 +99,17 @@ func ParseSectionResponse(response *http.Response, crnToFind string) ([]Section,
 // Phone Functions
 ////////////////////////////
 
-// PlivoRequest is the type sent to Plivo for texts
-type PlivoRequest struct {
-	Src  string `json:"src"`
-	Dst  string `json:"dst"`
-	Text string `json:"text"`
-}
-
 // SendText sends a text message to the specified phone number
 func SendText(client *http.Client, number, message string) (response *http.Response, err error) {
 	authID := os.Getenv("PLIVO_AUTH_ID")
 	authToken := os.Getenv("PLIVO_AUTH_TOKEN")
 	if authID == "" || authToken == "" {
-		panic("nil env")
+		log.Errorf("Environment is missing required variables PLIVO_AUTH_ID and PLIVO_AUTH_TOKEN")
+		return nil, err
 	}
 	// TODO: Create sms callback handler
-	url := fmt.Sprintf("https://api.plivo.com/v1/Account/%v/Message/", authID)
-	data := PlivoRequest{Src: "14068000110", Dst: number, Text: message}
+	url := fmt.Sprintf(constants.PlivoAPIEndpoint, authID)
+	data := constants.PlivoRequest{Src: constants.PlivoSrcNum, Dst: number, Text: message}
 
 	js, err := json.Marshal(data)
 	if err != nil {
@@ -156,7 +131,7 @@ func SendText(client *http.Client, number, message string) (response *http.Respo
 	return resp, err
 }
 
-// FetchUserDataWithNumber check firebase to see if the user exists in our database
+// FetchUserDataWithNumber check firebase to see if the user exists in our database. Returns userData map and userID
 func FetchUserDataWithNumber(ctx context.Context, fbClient *firestore.Client, number string) (map[string]interface{}, string) {
 	checkedNumber := fmt.Sprintf("+%v", strings.Trim(number, " "))
 
@@ -165,7 +140,7 @@ func FetchUserDataWithNumber(ctx context.Context, fbClient *firestore.Client, nu
 	parsed, err := docs.GetAll()
 	if err != nil {
 		log.WithContext(ctx).WithError(err).Errorf("DoesUserExist Error")
-		panic(err)
+		return nil, ""
 	}
 	if len(parsed) > 0 {
 		userData := parsed[0].Data()
@@ -186,22 +161,22 @@ func LookupUserNumber(ctx context.Context, fbClient *firestore.Client, uid strin
 }
 
 // GetFirebaseClient creates and returns a new firebase client, used to interact with the database
-func GetFirebaseClient(ctx context.Context) *firestore.Client {
+func GetFirebaseClient(ctx context.Context) (*firestore.Client, error) {
 	firebasePID := os.Getenv("FIREBASE_PROJECT")
 	log.WithContext(ctx).Infof("Loaded firebase project ID.")
 	if firebasePID == "" {
-		log.WithContext(ctx).Errorf("Firebase Project ID is nil, I cannot continue.")
-		panic("Firebase Project ID is nil")
+		log.WithContext(ctx).Errorf("Firebase Project ID is nil")
+		return nil, fmt.Errorf("Firebase Project ID is nil")
 	}
 
 	fbClient, err := firestore.NewClient(ctx, firebasePID)
 	if err != nil {
 		log.WithContext(ctx).WithError(err).Errorf("Could not create new client for Firebase")
-		return nil
+		return nil, fmt.Errorf("Could not create new client for Firebase")
 	}
 	log.WithContext(ctx).Infof("successfully opened firestore client")
 
-	return fbClient
+	return fbClient, nil
 }
 
 // MoveTrackedSection moves old sections out of the prod area
@@ -226,9 +201,9 @@ func MoveTrackedSection(ctx context.Context, fbClient *firestore.Client, crn, ui
 	}
 
 	//  if there is a doc, merge with it rather than making a new one
-	if archiveDocs != nil {
+	if archiveDocs != nil || len(archiveDocs) > 0 {
 		if len(archiveDocs) > 1 {
-			log.WithContext(ctx).WithError(err).Errorf("Duplicate archiveDocs: %v", archiveDocs)
+			log.WithContext(ctx).Warningf("Duplicate archiveDocs: %v", archiveDocs)
 		}
 
 		//  Get the data for the archive docs
@@ -237,15 +212,15 @@ func MoveTrackedSection(ctx context.Context, fbClient *firestore.Client, crn, ui
 		// get all the users
 		users, ok := data["users"].([]interface{})
 		if !ok {
-			log.WithContext(ctx).WithError(err).Errorf("couldn't parse userslice")
-			return nil
+			log.WithContext(ctx).Errorf("couldn't parse all userdata")
+			return fmt.Errorf("Couldn't parse all userdata")
 		}
 
 		// get all the users
 		usersToAdd, ok := docToMoveData["users"].([]interface{})
 		if !ok {
 			log.WithContext(ctx).WithError(err).Errorf("couldn't parse userslice")
-			return nil
+			return fmt.Errorf("couldn't parse userslice")
 		}
 
 		//  make a mega list
@@ -257,9 +232,8 @@ func MoveTrackedSection(ctx context.Context, fbClient *firestore.Client, crn, ui
 		}, firestore.MergeAll)
 		if err != nil {
 			log.WithContext(ctx).WithError(err).Errorf("Error appending users to archive")
-			return err
+			return fmt.Errorf("Error appending users to archive")
 		}
-
 	} else {
 
 		// Add a new doc
@@ -277,7 +251,5 @@ func MoveTrackedSection(ctx context.Context, fbClient *firestore.Client, crn, ui
 		log.WithContext(ctx).WithError(err).Errorf("Error deleting old document")
 		return err
 	}
-
 	return nil
-
 }
