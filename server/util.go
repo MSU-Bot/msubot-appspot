@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"cloud.google.com/go/firestore"
+	"firebase.google.com/go/auth"
 	"github.com/PuerkitoBio/goquery"
 	log "github.com/sirupsen/logrus"
 )
@@ -185,23 +186,31 @@ func LookupUserNumber(ctx context.Context, fbClient *firestore.Client, uid strin
 	return doc.Data()["number"].(string), nil
 }
 
-// GetFirebaseClient creates and returns a new firebase client, used to interact with the database
-func GetFirebaseClient(ctx context.Context) *firestore.Client {
-	firebasePID := os.Getenv("FIREBASE_PROJECT")
-	log.WithContext(ctx).Infof("Loaded firebase project ID.")
-	if firebasePID == "" {
-		log.WithContext(ctx).Errorf("Firebase Project ID is nil, I cannot continue.")
-		panic("Firebase Project ID is nil")
-	}
+// ValidateUserClaims returns a firebase userRecord after verifying the identity of the user
+func ValidateUserClaims(ctx context.Context, tokenString, userID string) (*auth.UserRecord, error) {
+	_, err := GetFirebaseAdminClient(ctx)
 
-	fbClient, err := firestore.NewClient(ctx, firebasePID)
+	auth, err := GetFirebaseAuthClient(ctx)
 	if err != nil {
-		log.WithContext(ctx).WithError(err).Errorf("Could not create new client for Firebase")
-		return nil
+		return nil, err
 	}
-	log.WithContext(ctx).Infof("successfully opened firestore client")
 
-	return fbClient
+	token, err := auth.VerifyIDTokenAndCheckRevoked(ctx, tokenString)
+	if err != nil {
+		return nil, err
+	}
+
+	if token.UID != userID {
+		return nil, fmt.Errorf("User Impersonation")
+	}
+
+	userRecord, err := auth.GetUser(ctx, token.UID)
+	if err != nil {
+		return nil, err
+	}
+
+	return userRecord, nil
+
 }
 
 // MoveTrackedSection moves old sections out of the prod area

@@ -1,51 +1,67 @@
 package server
 
 import (
+	"encoding/json"
+	"io"
+	"io/ioutil"
 	"net/http"
-	"os"
 
-	"cloud.google.com/go/firestore"
-	"google.golang.org/appengine"
-	"google.golang.org/appengine/log"
+	log "github.com/sirupsen/logrus"
 )
 
-// AddUserToSectionHandler tba
-func AddUserToSectionHandler(w http.ResponseWriter, r *http.Request) {
+type addSectionRequest struct {
+	Token  string `json:"token"`
+	UserID string `json:"userid"`
+	CRNs   []int  `json:"crns"`
+}
 
-	ctx := appengine.NewContext(r)
-	log.Infof(ctx, "Context loaded. Starting execution.")
-
-	requestBody, err := r.GetBody()
-	if err != nil || requestBody == nil {
-		log.Errorf(ctx, "Could not get request body: %v", err)
-		w.WriteHeader(500)
-		return
-	}
-	defer r.Body.Close()
-
-	queryString := r.URL.Query()
-
-	course := queryString["course"]
-	dept := queryString["dept"]
-	term := queryString["term"]
+// AddTrackedSectionHandler tba
+func AddTrackedSectionHandler(w http.ResponseWriter, r *http.Request) {
 
 	//Set response headers
 	w.Header().Add("Access-Control-Allow-Origin", "*")
-	w.Header().Add("Access-Control-Allow-Methods", "GET")
+	w.Header().Add("Access-Control-Allow-Methods", "POST")
 
-	firebasePID := os.Getenv("FIREBASE_PROJECT")
-	log.Debugf(ctx, "Loaded firebase project ID: %v", firebasePID)
-	if firebasePID == "" {
-		log.Criticalf(ctx, "Firebase Project ID is nil, I cannot continue.")
-		panic("Firebase Project ID is nil")
-	}
+	// Load up a context
+	ctx := r.Context()
+	log.WithContext(ctx).Infof("Context loaded. Starting execution.")
 
-	fbClient, err := firestore.NewClient(ctx, firebasePID)
-	defer fbClient.Close()
+	req, err := parseAndFormatRequest(r.Body)
 	if err != nil {
-		log.Errorf(ctx, "Could not create new client for Firebase %v", err)
-		w.WriteHeader(500)
+		log.WithContext(ctx).WithError(err).Warning("Could not read request body")
+		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
+	user, err := ValidateUserClaims(ctx, req.Token, req.UserID)
+	if err != nil {
+		log.WithContext(ctx).WithError(err).Errorf("Could not validate user")
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+
+	fbClient := GetFirebaseClient(ctx)
+
+	fireclient
+	if fbClient == nil {
+		log.WithContext(ctx).Warning("Unable to get firebase client")
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+}
+
+func parseAndFormatRequest(body io.ReadCloser) (*addSectionRequest, error) {
+	respStruct := new(addSectionRequest)
+	requestBody, err := ioutil.ReadAll(body)
+	if err != nil {
+		return respStruct, err
+	}
+
+	err = json.Unmarshal(requestBody, &respStruct)
+	if err != nil {
+		return respStruct, err
+	}
+
+	return respStruct, nil
 }

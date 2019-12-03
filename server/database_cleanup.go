@@ -25,7 +25,6 @@ func DatabaseCleanupHandler(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(500)
 		return
 	}
-	defer fbClient.Close()
 
 	// Get the list of sections we are actively tracking
 	sectionsSnapshot := fbClient.Collection("tracked_sections").Documents(ctx)

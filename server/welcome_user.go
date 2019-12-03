@@ -30,7 +30,6 @@ func WelcomeUserHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	fbClient, err := firestore.NewClient(ctx, firebasePID)
-	defer fbClient.Close()
 	if err != nil {
 		log.WithContext(ctx).WithError(err).Errorf("Could not create new client for Firebase")
 		w.WriteHeader(500)

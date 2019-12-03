@@ -19,10 +19,11 @@ func main() {
 	// http.HandleFunc("/DatabaseCleanup", server.DatabaseCleanupHandler)
 	http.HandleFunc("/receivemessage", server.ReceiveMessageHandler)
 	http.HandleFunc("/healthcheck", server.HealthcheckHandler)
+	http.HandleFunc("/addtrackedsection", server.AddTrackedSectionHandler)
 
 	port := os.Getenv("PORT")
 	if port == "" {
-		port = "8080"
+		port = "8081"
 		log.Printf("Defaulting to port %s", port)
 	}
 

@@ -25,7 +25,6 @@ func PruneSectionsHandler(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(500)
 		return
 	}
-	defer fbClient.Close()
 
 	now := time.Now()
 	term := "00"
