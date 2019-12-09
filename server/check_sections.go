@@ -258,9 +258,20 @@ func sendOpenSeatMessages(ctx context.Context, client *http.Client, fbClient *fi
 	var userNumbers string
 	message := fmt.Sprintf("%v%v - %v with CRN %v has %v open seats! Get to MyInfo and register before it's gone!", section.DeptAbbr, section.CourseNumber, section.CourseName, section.Crn, section.AvailableSeats)
 	for _, user := range users {
-		number, err := LookupUserNumber(ctx, fbClient, user.(string))
+		userID, ok := user.(string)
+		if !ok {
+			log.WithContext(ctx).Errorf("Unable to parse userID for section message send")
+			continue
+		}
+
+		number, err := LookupUserNumber(ctx, fbClient, userID)
 		if err != nil {
-			log.WithContext(ctx).Errorf("Unable to send a text to user %s", user.(string))
+			log.WithContext(ctx).Errorf("Unable to look up number for user %s", userID)
+			continue
+		}
+		if number == "" {
+			log.WithContext(ctx).Errorf("User with UID %s does not have a number", userID)
+			continue
 		}
 		if userNumbers == "" {
 			userNumbers = number
@@ -270,9 +281,9 @@ func sendOpenSeatMessages(ctx context.Context, client *http.Client, fbClient *fi
 	}
 	resp, err := SendText(client, userNumbers, message)
 	if err != nil {
-		log.WithContext(ctx).Errorf("error sending text: %v", err)
+		log.WithContext(ctx).WithError(err).Errorf("error sending text")
 		return err
 	}
-	log.WithContext(ctx).Infof("%v", resp)
+	log.WithContext(ctx).Debugf("Response from Text Provider: %v", resp)
 	return nil
 }
