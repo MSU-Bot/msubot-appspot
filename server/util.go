@@ -182,7 +182,16 @@ func LookupUserNumber(ctx context.Context, fbClient *firestore.Client, uid strin
 		log.WithContext(ctx).WithError(err).Errorf("Tracked user not found. This should've been cleaned up")
 		return "", err
 	}
-	return doc.Data()["number"].(string), nil
+
+	numIntf := doc.Data()["number"]
+
+	num, ok := numIntf.(string)
+	if !ok {
+		log.WithContext(ctx).Errorf("Unable to parse user's number as a string, they may be in the midst of resetting it")
+		return "", err
+	}
+
+	return num, nil
 }
 
 // GetFirebaseClient creates and returns a new firebase client, used to interact with the database
