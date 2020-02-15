@@ -1,4 +1,4 @@
-package server
+package scraper
 
 import (
 	"encoding/json"
@@ -6,11 +6,12 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/SpencerCornish/msubot-appspot/server/serverutils"
 	log "github.com/sirupsen/logrus"
 )
 
-// ScrapeSectionHandler scrapes
-func ScrapeSectionHandler(w http.ResponseWriter, r *http.Request) {
+// HandleRequest scrapes
+func HandleRequest(w http.ResponseWriter, r *http.Request) {
 
 	ctx := r.Context()
 	client := http.DefaultClient
@@ -30,7 +31,7 @@ func ScrapeSectionHandler(w http.ResponseWriter, r *http.Request) {
 	log.WithContext(ctx).Debugf("dept: %v", dept)
 	log.WithContext(ctx).Debugf("course: %v", course)
 
-	response, err := MakeAtlasSectionRequest(client, term[0], dept[0], course[0])
+	response, err := serverutils.MakeAtlasSectionRequest(client, term[0], dept[0], course[0])
 
 	if err != nil {
 		log.WithContext(ctx).Errorf("Request to myInfo failed with error: %v", err)
@@ -41,7 +42,7 @@ func ScrapeSectionHandler(w http.ResponseWriter, r *http.Request) {
 
 	start := time.Now()
 
-	sections, err := ParseSectionResponse(response, "")
+	sections, err := serverutils.ParseSectionResponse(response, "")
 
 	elapsed := time.Since(start)
 	log.WithContext(ctx).Infof("Scrape time: %v", elapsed.String())

@@ -1,4 +1,4 @@
-package server
+package serverutils
 
 import (
 	"bytes"
@@ -12,29 +12,9 @@ import (
 
 	"cloud.google.com/go/firestore"
 	"github.com/PuerkitoBio/goquery"
+	"github.com/SpencerCornish/msubot-appspot/server/models"
 	log "github.com/sirupsen/logrus"
 )
-
-// Section is a section model
-type Section struct {
-	DeptAbbr string
-	DeptName string
-
-	CourseName   string
-	CourseNumber string
-	CourseType   string
-	Credits      string
-
-	Instructor string
-	Time       string
-	Location   string
-
-	SectionNumber  string
-	Crn            string
-	TotalSeats     string
-	TakenSeats     string
-	AvailableSeats string
-}
 
 // MakeAtlasSectionRequest makes a request to Atlas for section data in the term, department, and course
 func MakeAtlasSectionRequest(client *http.Client, term, dept, course string) (*http.Response, error) {
@@ -58,8 +38,8 @@ func MakeAtlasSectionRequest(client *http.Client, term, dept, course string) (*h
 }
 
 // ParseSectionResponse turns the http.Response into a slice of sections
-func ParseSectionResponse(response *http.Response, crnToFind string) ([]Section, error) {
-	sections := []Section{}
+func ParseSectionResponse(response *http.Response, crnToFind string) ([]models.Section, error) {
+	sections := []models.Section{}
 	doc, err := goquery.NewDocumentFromReader(response.Body)
 	if err != nil {
 		return nil, err
@@ -77,7 +57,7 @@ func ParseSectionResponse(response *http.Response, crnToFind string) ([]Section,
 				panic("regex didn't work. Did the data model change?")
 			}
 
-			newSection := Section{
+			newSection := models.Section{
 				DeptAbbr:       matches[0],
 				CourseNumber:   matches[1],
 				SectionNumber:  matches[2],
@@ -119,7 +99,7 @@ func ParseSectionResponse(response *http.Response, crnToFind string) ([]Section,
 ////////////////////////////
 
 // PlivoRequest is the type sent to Plivo for texts
-type PlivoRequest struct {
+type plivoRequest struct {
 	Src  string `json:"src"`
 	Dst  string `json:"dst"`
 	Text string `json:"text"`
@@ -134,7 +114,7 @@ func SendText(client *http.Client, number, message string) (response *http.Respo
 	}
 	// TODO: Create sms callback handler
 	url := fmt.Sprintf("https://api.plivo.com/v1/Account/%v/Message/", authID)
-	data := PlivoRequest{Src: "14068000110", Dst: number, Text: message}
+	data := plivoRequest{Src: "14068000110", Dst: number, Text: message}
 
 	js, err := json.Marshal(data)
 	if err != nil {

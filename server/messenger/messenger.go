@@ -1,17 +1,18 @@
-package server
+package messenger
 
 import (
 	"fmt"
 	"net/http"
 	"strings"
 
+	"github.com/SpencerCornish/msubot-appspot/server/serverutils"
 	"github.com/plivo/plivo-go/xml"
 
 	log "github.com/sirupsen/logrus"
 )
 
-// ReceiveMessageHandler handles ingest of SMS messages from plivo
-func ReceiveMessageHandler(w http.ResponseWriter, r *http.Request) {
+// RecieveMessage handles ingest of SMS messages from plivo
+func RecieveMessage(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	log.WithContext(ctx).Infof("Context loaded. Starting execution.")
 
@@ -26,9 +27,9 @@ func ReceiveMessageHandler(w http.ResponseWriter, r *http.Request) {
 	if strings.Contains(text, "HELP") {
 		responseText = fmt.Sprintf("Available Commands:\nHELP - prints this help message\nLIST - lists your tracked classes and their seats")
 	} else if strings.Contains(text, "LIST") {
-		fbClient := GetFirebaseClient(ctx)
+		fbClient := serverutils.GetFirebaseClient(ctx)
 
-		_, uid := FetchUserDataWithNumber(ctx, fbClient, from)
+		_, uid := serverutils.FetchUserDataWithNumber(ctx, fbClient, from)
 
 		log.WithContext(ctx).Infof("Found user with UID: %s", uid)
 
