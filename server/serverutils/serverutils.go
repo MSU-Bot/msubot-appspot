@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"regexp"
@@ -16,14 +17,16 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+const (
+	sectionRequestURL = "https://prodmyinfo.montana.edu/pls/bzagent/bzskcrse.PW_ListSchClassSimple"
+	sourceNumber      = "14068000110"
+)
+
 // MakeAtlasSectionRequest makes a request to Atlas for section data in the term, department, and course
 func MakeAtlasSectionRequest(client *http.Client, term, dept, course string) (*http.Response, error) {
-	body := fmt.Sprintf("sel_subj=dummy&bl_online=FALSE&sel_day=dummy&term=%v&sel_subj=%v&sel_inst=ANY&sel_online=&sel_crse=%v&begin_hh=0&begin_mi=0&end_hh=0&end_mi=0",
-		term,
-		dept,
-		course)
+	body := buildAtlasRequestBody(term, dept, course)
 
-	req, err := http.NewRequest("POST", "https://prodmyinfo.montana.edu/pls/bzagent/bzskcrse.PW_ListSchClassSimple", strings.NewReader(body))
+	req, err := http.NewRequest("POST", sectionRequestURL, body)
 	defer req.Body.Close()
 	if err != nil {
 		return nil, err
@@ -35,6 +38,15 @@ func MakeAtlasSectionRequest(client *http.Client, term, dept, course string) (*h
 		return nil, err
 	}
 	return resp, nil
+}
+
+func buildAtlasRequestBody(term, department, course string) io.Reader {
+	body := fmt.Sprintf("sel_subj=dummy&bl_online=FALSE&sel_day=dummy&term=%v&sel_subj=%v&sel_inst=ANY&sel_online=&sel_crse=%v&begin_hh=0&begin_mi=0&end_hh=0&end_mi=0",
+		term,
+		department,
+		course)
+
+	return strings.NewReader(body)
 }
 
 // ParseSectionResponse turns the http.Response into a slice of sections
@@ -105,6 +117,10 @@ type plivoRequest struct {
 	Text string `json:"text"`
 }
 
+func getPlivoURL(authID string) string {
+	return fmt.Sprintf("https://api.plivo.com/v1/Account/%s/Message/", authID)
+}
+
 // SendText sends a text message to the specified phone number
 func SendText(client *http.Client, number, message string) (response *http.Response, err error) {
 	authID := os.Getenv("PLIVO_AUTH_ID")
@@ -113,8 +129,8 @@ func SendText(client *http.Client, number, message string) (response *http.Respo
 		panic("nil env")
 	}
 	// TODO: Create sms callback handler
-	url := fmt.Sprintf("https://api.plivo.com/v1/Account/%v/Message/", authID)
-	data := plivoRequest{Src: "14068000110", Dst: number, Text: message}
+	url := getPlivoURL(authID)
+	data := plivoRequest{Src: sourceNumber, Dst: number, Text: message}
 
 	js, err := json.Marshal(data)
 	if err != nil {

@@ -256,7 +256,6 @@ func removeSectionFromUserData(ctx context.Context, fbClient *firestore.Client, 
 	}
 }
 
-// Messaging
 func sendOpenSeatMessages(ctx context.Context, client *http.Client, fbClient *firestore.Client, users []interface{}, section models.Section) error {
 	var userNumbers string
 	message := fmt.Sprintf("%v%v - %v with CRN %v has %v open seats! Get to MyInfo and register before it's gone!", section.DeptAbbr, section.CourseNumber, section.CourseName, section.Crn, section.AvailableSeats)
