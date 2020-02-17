@@ -32,6 +32,6 @@ jobs:
           command: |
             go test -v ./... -covermode=count -coverprofile=coverage.out
             $GOPATH/bin/goveralls -coverprofile=coverage.out -service=circle-ci -repotoken $COVERALLS_TOKEN
-            gotestsum --junitfile unit-tests.xml
+            gotestsum --junitfile unit-tests.xml ./...
       - store_test_results:
           path: unit-tests.xml
