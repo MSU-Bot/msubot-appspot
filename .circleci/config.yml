@@ -24,7 +24,7 @@ jobs:
       # specify any bash command here prefixed with `run: `
       - run:
           name: Get Dependencies
-          command: go get -t -d ./...'
+          command: go get -t -d ./...
       - run:
           name: Run Tests and Report Coverage
           command: |
