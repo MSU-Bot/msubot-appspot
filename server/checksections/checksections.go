@@ -9,9 +9,9 @@ import (
 	"github.com/SpencerCornish/msubot-appspot/server/models"
 	"github.com/SpencerCornish/msubot-appspot/server/serverutils"
 
-	log "github.com/sirupsen/logrus"
-
 	"cloud.google.com/go/firestore"
+
+	log "github.com/sirupsen/logrus"
 )
 
 // HandleRequest runs often to check for open seats
