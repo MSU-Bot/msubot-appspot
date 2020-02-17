@@ -30,6 +30,9 @@ jobs:
       - run:
           name: Run Tests and Report Coverage
           command: |
-            gotestsum --junitfile unit-tests.xml -v ./... -covermode=count -coverprofile=coverage.out
+            go test -v ./... -covermode=count -coverprofile=coverage.out
             $GOPATH/bin/goveralls -coverprofile=coverage.out -service=circle-ci -repotoken $COVERALLS_TOKEN
+            gotestsum --junitfile /tmp/unit-tests.xml
 
+- store_test_results:
+    path: /tmp/unit-tests.xml
