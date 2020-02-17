@@ -24,10 +24,12 @@ jobs:
       # specify any bash command here prefixed with `run: `
       - run:
           name: Get Dependencies
-          command: go get -t -d ./...
+          command: |
+            go get -t -d ./...
+            go install github.com/mattn/goveralls
       - run:
           name: Run Tests and Report Coverage
           command: |
             go test -v ./... -covermode=count -coverprofile=coverage.out
-            $HOME/gopath/bin/goveralls -coverprofile=coverage.out -service=circle-ci -repotoken $COVERALLS_TOKEN
+            $GOPATH/bin/goveralls -coverprofile=coverage.out -service=circle-ci -repotoken $COVERALLS_TOKEN
 
