@@ -1,10 +1,11 @@
-package server
+package serverutils
 
 import (
 	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"regexp"
@@ -12,38 +13,20 @@ import (
 
 	"cloud.google.com/go/firestore"
 	"github.com/PuerkitoBio/goquery"
+	"github.com/SpencerCornish/msubot-appspot/server/models"
 	log "github.com/sirupsen/logrus"
 )
 
-// Section is a section model
-type Section struct {
-	DeptAbbr string
-	DeptName string
-
-	CourseName   string
-	CourseNumber string
-	CourseType   string
-	Credits      string
-
-	Instructor string
-	Time       string
-	Location   string
-
-	SectionNumber  string
-	Crn            string
-	TotalSeats     string
-	TakenSeats     string
-	AvailableSeats string
-}
+const (
+	sectionRequestURL = "https://prodmyinfo.montana.edu/pls/bzagent/bzskcrse.PW_ListSchClassSimple"
+	sourceNumber      = "14068000110"
+)
 
 // MakeAtlasSectionRequest makes a request to Atlas for section data in the term, department, and course
 func MakeAtlasSectionRequest(client *http.Client, term, dept, course string) (*http.Response, error) {
-	body := fmt.Sprintf("sel_subj=dummy&bl_online=FALSE&sel_day=dummy&term=%v&sel_subj=%v&sel_inst=ANY&sel_online=&sel_crse=%v&begin_hh=0&begin_mi=0&end_hh=0&end_mi=0",
-		term,
-		dept,
-		course)
+	body := buildAtlasRequestBody(term, dept, course)
 
-	req, err := http.NewRequest("POST", "https://prodmyinfo.montana.edu/pls/bzagent/bzskcrse.PW_ListSchClassSimple", strings.NewReader(body))
+	req, err := http.NewRequest("POST", sectionRequestURL, body)
 	defer req.Body.Close()
 	if err != nil {
 		return nil, err
@@ -57,9 +40,18 @@ func MakeAtlasSectionRequest(client *http.Client, term, dept, course string) (*h
 	return resp, nil
 }
 
+func buildAtlasRequestBody(term, department, course string) io.Reader {
+	body := fmt.Sprintf("sel_subj=dummy&bl_online=FALSE&sel_day=dummy&term=%v&sel_subj=%v&sel_inst=ANY&sel_online=&sel_crse=%v&begin_hh=0&begin_mi=0&end_hh=0&end_mi=0",
+		term,
+		department,
+		course)
+
+	return strings.NewReader(body)
+}
+
 // ParseSectionResponse turns the http.Response into a slice of sections
-func ParseSectionResponse(response *http.Response, crnToFind string) ([]Section, error) {
-	sections := []Section{}
+func ParseSectionResponse(response *http.Response, crnToFind string) ([]models.Section, error) {
+	sections := []models.Section{}
 	doc, err := goquery.NewDocumentFromReader(response.Body)
 	if err != nil {
 		return nil, err
@@ -77,7 +69,7 @@ func ParseSectionResponse(response *http.Response, crnToFind string) ([]Section,
 				panic("regex didn't work. Did the data model change?")
 			}
 
-			newSection := Section{
+			newSection := models.Section{
 				DeptAbbr:       matches[0],
 				CourseNumber:   matches[1],
 				SectionNumber:  matches[2],
@@ -119,10 +111,14 @@ func ParseSectionResponse(response *http.Response, crnToFind string) ([]Section,
 ////////////////////////////
 
 // PlivoRequest is the type sent to Plivo for texts
-type PlivoRequest struct {
+type plivoRequest struct {
 	Src  string `json:"src"`
 	Dst  string `json:"dst"`
 	Text string `json:"text"`
+}
+
+func getPlivoURL(authID string) string {
+	return fmt.Sprintf("https://api.plivo.com/v1/Account/%s/Message/", authID)
 }
 
 // SendText sends a text message to the specified phone number
@@ -133,8 +129,8 @@ func SendText(client *http.Client, number, message string) (response *http.Respo
 		panic("nil env")
 	}
 	// TODO: Create sms callback handler
-	url := fmt.Sprintf("https://api.plivo.com/v1/Account/%v/Message/", authID)
-	data := PlivoRequest{Src: "14068000110", Dst: number, Text: message}
+	url := getPlivoURL(authID)
+	data := plivoRequest{Src: sourceNumber, Dst: number, Text: message}
 
 	js, err := json.Marshal(data)
 	if err != nil {

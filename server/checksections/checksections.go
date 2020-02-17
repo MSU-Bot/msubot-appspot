@@ -1,4 +1,4 @@
-package server
+package checksections
 
 import (
 	"context"
@@ -6,13 +6,16 @@ import (
 	"net/http"
 	"strconv"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/SpencerCornish/msubot-appspot/server/models"
+	"github.com/SpencerCornish/msubot-appspot/server/serverutils"
 
 	"cloud.google.com/go/firestore"
+
+	log "github.com/sirupsen/logrus"
 )
 
-// CheckSectionsHandler runs often to check for open seats
-func CheckSectionsHandler(w http.ResponseWriter, r *http.Request) {
+// HandleRequest runs often to check for open seats
+func HandleRequest(w http.ResponseWriter, r *http.Request) {
 
 	// Load up a context and http client
 	ctx := r.Context()
@@ -27,7 +30,7 @@ func CheckSectionsHandler(w http.ResponseWriter, r *http.Request) {
 	// 	return
 	// }
 
-	fbClient := GetFirebaseClient(ctx)
+	fbClient := serverutils.GetFirebaseClient(ctx)
 	if fbClient == nil {
 		w.WriteHeader(500)
 		return
@@ -123,7 +126,7 @@ func sectionCheckWorker(ctx context.Context, jobs <-chan *firestore.DocumentSnap
 		crn := sectionData["crn"].(string)
 
 		// Make a request to Atlas
-		resp, err := MakeAtlasSectionRequest(client, term, departmentAbbr, courseNumber)
+		resp, err := serverutils.MakeAtlasSectionRequest(client, term, departmentAbbr, courseNumber)
 		if err != nil {
 			log.WithContext(ctx).Errorf("Making Atlas request failed for %v: %v", departmentAbbr+courseNumber, err)
 
@@ -132,7 +135,7 @@ func sectionCheckWorker(ctx context.Context, jobs <-chan *firestore.DocumentSnap
 		}
 
 		// Parse into a section struct
-		newSectionData, err := ParseSectionResponse(resp, crn)
+		newSectionData, err := serverutils.ParseSectionResponse(resp, crn)
 		if err != nil {
 			log.WithContext(ctx).Errorf("Parsing section failed: %v", err)
 
@@ -174,7 +177,7 @@ func sectionCheckWorker(ctx context.Context, jobs <-chan *firestore.DocumentSnap
 
 		if len(users) < 1 {
 			log.WithContext(ctx).Infof("CRN %s has %d users. Deleting CRN", crn, len(users))
-			err := MoveTrackedSection(ctx, fbClient, newSectionData[0].Crn, sectionUID, term)
+			err := serverutils.MoveTrackedSection(ctx, fbClient, newSectionData[0].Crn, sectionUID, term)
 			if err != nil {
 				log.WithContext(ctx).Errorf("Failed to move the stale section data: %v", err)
 			}
@@ -195,7 +198,7 @@ func sectionCheckWorker(ctx context.Context, jobs <-chan *firestore.DocumentSnap
 			sendOpenSeatMessages(ctx, client, fbClient, users, newSectionData[0])
 			removeSectionFromUserData(ctx, fbClient, fbBatch, users, newSectionData[0].Crn)
 
-			err := MoveTrackedSection(ctx, fbClient, newSectionData[0].Crn, sectionUID, term)
+			err := serverutils.MoveTrackedSection(ctx, fbClient, newSectionData[0].Crn, sectionUID, term)
 			if err != nil {
 				log.WithContext(ctx).Errorf("Failed to move the stale section data: %v", err)
 			}
@@ -211,7 +214,7 @@ func sectionCheckWorker(ctx context.Context, jobs <-chan *firestore.DocumentSnap
 	}
 }
 
-func updateTrackedSection(ctx context.Context, fbBatch *firestore.WriteBatch, fbRef *firestore.DocumentRef, section Section) {
+func updateTrackedSection(ctx context.Context, fbBatch *firestore.WriteBatch, fbRef *firestore.DocumentRef, section models.Section) {
 	fbBatch.Set(fbRef, map[string]interface{}{
 		"department": section.DeptName,
 		"courseName": section.CourseName,
@@ -253,12 +256,11 @@ func removeSectionFromUserData(ctx context.Context, fbClient *firestore.Client, 
 	}
 }
 
-// Messaging
-func sendOpenSeatMessages(ctx context.Context, client *http.Client, fbClient *firestore.Client, users []interface{}, section Section) error {
+func sendOpenSeatMessages(ctx context.Context, client *http.Client, fbClient *firestore.Client, users []interface{}, section models.Section) error {
 	var userNumbers string
 	message := fmt.Sprintf("%v%v - %v with CRN %v has %v open seats! Get to MyInfo and register before it's gone!", section.DeptAbbr, section.CourseNumber, section.CourseName, section.Crn, section.AvailableSeats)
 	for _, user := range users {
-		number, err := LookupUserNumber(ctx, fbClient, user.(string))
+		number, err := serverutils.LookupUserNumber(ctx, fbClient, user.(string))
 		if err != nil {
 			log.WithContext(ctx).Errorf("Unable to send a text to user %s", user.(string))
 		}
@@ -268,7 +270,7 @@ func sendOpenSeatMessages(ctx context.Context, client *http.Client, fbClient *fi
 			userNumbers = fmt.Sprintf("%v<%v", userNumbers, number)
 		}
 	}
-	resp, err := SendText(client, userNumbers, message)
+	resp, err := serverutils.SendText(client, userNumbers, message)
 	if err != nil {
 		log.WithContext(ctx).Errorf("error sending text: %v", err)
 		return err

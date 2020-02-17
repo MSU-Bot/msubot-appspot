@@ -1,15 +1,16 @@
-package server
+package pruner
 
 import (
 	"fmt"
 	"net/http"
 	"time"
 
+	"github.com/SpencerCornish/msubot-appspot/server/serverutils"
 	log "github.com/sirupsen/logrus"
 )
 
-// PruneSectionsHandler is run daily to clean up expired course checkers from old semesters.
-func PruneSectionsHandler(w http.ResponseWriter, r *http.Request) {
+// HandleRequest is run daily to clean up expired course checkers from old semesters.
+func HandleRequest(w http.ResponseWriter, r *http.Request) {
 
 	ctx := r.Context()
 	log.WithContext(ctx).Infof("Context loaded. Starting execution.")
@@ -20,7 +21,7 @@ func PruneSectionsHandler(w http.ResponseWriter, r *http.Request) {
 	// 	return
 	// }
 
-	fbClient := GetFirebaseClient(ctx)
+	fbClient := serverutils.GetFirebaseClient(ctx)
 	if fbClient == nil {
 		w.WriteHeader(500)
 		return
@@ -73,7 +74,7 @@ func PruneSectionsHandler(w http.ResponseWriter, r *http.Request) {
 
 		log.WithContext(ctx).Infof("Moving Expired doc with uid %s because term was %v ", doc.Ref.ID, data["term"])
 
-		err := MoveTrackedSection(ctx, fbClient, crn, doc.Ref.ID, term)
+		err := serverutils.MoveTrackedSection(ctx, fbClient, crn, doc.Ref.ID, term)
 		if err != nil {
 			log.WithContext(ctx).Errorf("Unable to move doc with UID: %s", doc.Ref.ID)
 		}

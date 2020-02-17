@@ -1,4 +1,4 @@
-package server
+package healthcheck
 
 import (
 	"fmt"
@@ -8,8 +8,8 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-// HealthcheckHandler Can be called to check the state of myInfo
-func HealthcheckHandler(w http.ResponseWriter, r *http.Request) {
+// CheckHealth Can be called to check the state of myInfo
+func CheckHealth(w http.ResponseWriter, r *http.Request) {
 	// Load up a context and http client
 	// ctx := r.Context()
 	// log.Printf(string(ctx))
