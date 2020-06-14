@@ -1,5 +1,7 @@
 package models
 
+import "time"
+
 // Section is a section model
 type Section struct {
 	DeptAbbr string
@@ -19,4 +21,20 @@ type Section struct {
 	TotalSeats     string
 	TakenSeats     string
 	AvailableSeats string
+}
+
+// TrackedSectionRecord is a datastore record for tracked sections in firestore
+type TrackedSectionRecord struct {
+	CourseName     string
+	CourseNumber   string
+	CreationTime   time.Time
+	Crn            string
+	Department     string
+	DepartmentAbbr string
+	Instructor     string
+	OpenSeats      string
+	SectionNumber  int
+	Term           string
+	TotalSeats     string
+	Users          []string
 }
