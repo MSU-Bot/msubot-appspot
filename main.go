@@ -13,10 +13,12 @@ import (
 	"github.com/SpencerCornish/msubot-appspot/server/messenger"
 	"github.com/SpencerCornish/msubot-appspot/server/pruner"
 	"github.com/SpencerCornish/msubot-appspot/server/scraper"
+	"github.com/SpencerCornish/msubot-appspot/server/tracksections"
 )
 
 func main() {
 	http.HandleFunc("/sections", scraper.HandleRequest)
+	http.HandleFunc("/tracksections", tracksections.HandleRequest)
 	http.HandleFunc("/welcomeuser", server.WelcomeUserHandler)
 	http.HandleFunc("/checktrackedsections", checksections.HandleRequest)
 	http.HandleFunc("/prunesections", pruner.HandleRequest)
@@ -25,7 +27,7 @@ func main() {
 
 	port := os.Getenv("PORT")
 	if port == "" {
-		port = "8080"
+		port = "8090"
 		log.Printf("Defaulting to port %s", port)
 	}
 

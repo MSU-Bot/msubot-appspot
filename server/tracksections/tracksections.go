@@ -23,6 +23,10 @@ type trackRequest struct {
 	Term           string
 }
 
+type trackResponse struct {
+	DocIDs []string
+}
+
 // HandleRequest scrapes
 func HandleRequest(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
@@ -33,7 +37,7 @@ func HandleRequest(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid request method", http.StatusBadRequest)
 	}
 
-	authToken, err := mauth.VerifyToken(ctx, "TOKEN")
+	authToken, err := mauth.VerifyToken(ctx, r.Header.Get("Authorization"))
 	if err != nil {
 		http.Error(w, "Token is not valid", http.StatusForbidden)
 		return
@@ -46,11 +50,15 @@ func HandleRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	defer r.Body.Close()
+
 	// Get a firestore client
 	fs := serverutils.GetFirebaseClient(ctx)
-	writeBatch := fs.Batch()
+	defer fs.Close()
 
-	for _, crn := range request.Crns {
+	writeBatch := fs.Batch()
+	modifiedDocIDs := make([]string, len(request.Crns))
+	for i, crn := range request.Crns {
 		// check for an existing tracked section
 		docsForCrn := fs.Collection("sections_tracked").Where("crn", "==", crn).Where("term", "==", request.Term).Documents(ctx)
 		docs, err := docsForCrn.GetAll()
@@ -83,19 +91,58 @@ func HandleRequest(w http.ResponseWriter, r *http.Request) {
 				"users": newUserSlice,
 			}, firestore.MergeAll)
 
-		} else {
+			modifiedDocIDs[i] = docs[0].Ref.ID
 
+		} else {
+			// This section has not been tracked yet. Go get it
 			sectionData, err := getSectionMetadata(ctx, request, crn)
 			if err != nil {
+				log.WithContext(ctx).WithError(err).WithFields(log.Fields{"request": request, "crn": crn}).Error("Failed to request data from ATLAS")
 				http.Error(w, "Error getting course metadata", http.StatusInternalServerError)
 				return
 			}
-			// Doc does not yet exist
+			// if we didn't find a section, it's probably an invalid request. Log as an error for now, just to be safe
+			if sectionData == (models.Section{}) {
+				log.WithContext(ctx).WithFields(log.Fields{"request": request, "crn": crn}).Error("Didn't find a section. Invalid request?")
+				http.Error(w, "Invalid Request", http.StatusBadRequest)
+				return
+			}
+			newDocRef := fs.Collection("sections_tracked").NewDoc()
+			modifiedDocIDs[i] = newDocRef.ID
+
+			writeBatch.Set(newDocRef, map[string]interface{}{
+				"term":           sectionData.Term,
+				"departmentAbbr": sectionData.DeptAbbr,
+				"department":     sectionData.DeptName,
+				"courseName":     sectionData.CourseName,
+				"crn":            sectionData.Crn,
+				"courseNumber":   sectionData.CourseNumber,
+				"openSeats":      sectionData.AvailableSeats,
+				"totalSeats":     sectionData.TotalSeats,
+				"sectionNumber":  sectionData.SectionNumber,
+				"instructor":     sectionData.Instructor,
+				"users":          []string{authToken.UID},
+				"creationTime":   firestore.ServerTimestamp,
+			})
 
 		}
 
 	}
 
+	_, err = writeBatch.Commit(ctx)
+	if err != nil {
+		log.WithContext(ctx).WithError(err).Error("Failed to commit writeBatch")
+		http.Error(w, "Failure tracking classes", http.StatusInternalServerError)
+	}
+	responseBody := trackResponse{DocIDs: modifiedDocIDs}
+	resp, err := json.Marshal(responseBody)
+	if err != nil {
+		log.WithContext(ctx).WithError(err).WithField("responseBody", responseBody).Error("Failed to marshal response body")
+		http.Error(w, "Failed to parse response", http.StatusInternalServerError)
+		return
+	}
+
+	w.Write(resp)
 }
 
 func getSectionMetadata(ctx context.Context, request trackRequest, crn string) (models.Section, error) {
@@ -106,7 +153,7 @@ func getSectionMetadata(ctx context.Context, request trackRequest, crn string) (
 		log.WithContext(ctx).WithError(err).Error("Error getting new section data from ATLAS")
 		return models.Section{}, err
 	}
-	sectionDatas, err := serverutils.ParseSectionResponse(resp, crn)
+	sectionDatas, err := serverutils.ParseSectionResponse(resp, request.Term, crn)
 	if err != nil {
 		return models.Section{}, err
 	}

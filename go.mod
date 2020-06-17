@@ -6,6 +6,7 @@ require (
 	cloud.google.com/go/firestore v1.0.0
 	firebase.google.com/go v3.13.0+incompatible
 	github.com/PuerkitoBio/goquery v1.5.0
+	github.com/blang/semver/v4 v4.0.0 // indirect
 	github.com/mattn/go-isatty v0.0.12 // indirect
 	github.com/mattn/go-runewidth v0.0.8 // indirect
 	github.com/mattn/goveralls v0.0.5 // indirect

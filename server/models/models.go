@@ -4,6 +4,8 @@ import "time"
 
 // Section is a section model
 type Section struct {
+	Term string
+
 	DeptAbbr string
 	DeptName string
 
