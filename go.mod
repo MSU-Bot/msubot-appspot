@@ -7,7 +7,8 @@ require (
 	cloud.google.com/go/firestore v1.2.0
 	github.com/PuerkitoBio/goquery v1.5.1
 	github.com/andybalholm/cascadia v1.2.0 // indirect
-	github.com/plivo/plivo-go v4.7.0+incompatible
+	github.com/google/go-querystring v1.0.0 // indirect
+	github.com/plivo/plivo-go v4.9.1+incompatible
 	github.com/sirupsen/logrus v1.6.0
 	github.com/stretchr/testify v1.6.1
 	go.opencensus.io v0.22.4 // indirect
