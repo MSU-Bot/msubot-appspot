@@ -63,7 +63,9 @@ func HandleRequest(w http.ResponseWriter, r *http.Request) {
 		docsForCrn := fs.Collection("sections_tracked").Where("crn", "==", crn).Where("term", "==", request.Term).Documents(ctx)
 		docs, err := docsForCrn.GetAll()
 		if err != nil {
-			//TODO: Handle this shiz
+			log.WithContext(ctx).WithError(err).Error("Failed to fetch existing tracked sections")
+			http.Error(w, "Failed to fetch existing records", http.StatusInternalServerError)
+			return
 		}
 
 		if len(docs) != 0 {
@@ -71,11 +73,13 @@ func HandleRequest(w http.ResponseWriter, r *http.Request) {
 			if len(docs) > 1 {
 				log.WithContext(ctx).Error("Duplicate entries for the same class. Using the first one")
 			}
+
 			var trackedRecord models.TrackedSectionRecord
 			err = docs[0].DataTo(&trackedRecord)
 			if err != nil {
 				log.WithContext(ctx).WithError(err).Error("Unable to parse existing section record")
-				// TODO: Decide what we should do here...
+				http.Error(w, "Internal data error", http.StatusInternalServerError)
+				return
 			}
 
 			for _, uid := range trackedRecord.Users {
@@ -103,7 +107,7 @@ func HandleRequest(w http.ResponseWriter, r *http.Request) {
 			}
 			// if we didn't find a section, it's probably an invalid request. Log as an error for now, just to be safe
 			if sectionData == (models.Section{}) {
-				log.WithContext(ctx).WithFields(log.Fields{"request": request, "crn": crn}).Error("Didn't find a section. Invalid request?")
+				log.WithContext(ctx).WithFields(log.Fields{"request": request, "crn": crn}).Error("Didn't find a section. Invalid request")
 				http.Error(w, "Invalid Request", http.StatusBadRequest)
 				return
 			}

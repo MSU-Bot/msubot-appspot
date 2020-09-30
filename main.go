@@ -18,12 +18,14 @@ import (
 
 func main() {
 	http.HandleFunc("/sections", scraper.HandleRequest)
-	http.HandleFunc("/tracksections", tracksections.HandleRequest)
 	http.HandleFunc("/welcomeuser", server.WelcomeUserHandler)
 	http.HandleFunc("/checktrackedsections", checksections.HandleRequest)
 	http.HandleFunc("/prunesections", pruner.HandleRequest)
 	http.HandleFunc("/receivemessage", messenger.RecieveMessage)
 	http.HandleFunc("/healthcheck", healthcheck.CheckHealth)
+
+	http.HandleFunc("/tracksections", tracksections.HandleRequest)
+	http.HandleFunc("/removetrackedsections", removetrackedsections.HandleRequest)
 
 	port := os.Getenv("PORT")
 	if port == "" {
