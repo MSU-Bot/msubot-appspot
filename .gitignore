@@ -6,6 +6,7 @@
 *.dylib
 
 app-prod.yaml
+app-staging.yaml
 app.yaml
 
 # Test binary, build with `go test -c`
@@ -17,3 +18,4 @@ app.yaml
 msubot-appspot
 
 .vscode/
+
