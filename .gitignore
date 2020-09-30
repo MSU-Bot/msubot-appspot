@@ -6,6 +6,7 @@
 *.dylib
 
 app-prod.yaml
+app-staging.yaml
 app.yaml
 app-staging.yaml
 
@@ -18,3 +19,4 @@ app-staging.yaml
 msubot-appspot
 
 .vscode/
+
