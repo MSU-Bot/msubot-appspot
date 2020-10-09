@@ -4,7 +4,7 @@ go 1.13
 
 require (
 	cloud.google.com/go/firestore v1.3.0
-	github.com/PuerkitoBio/goquery v1.5.1
+	github.com/PuerkitoBio/goquery v1.6.0
 	github.com/andybalholm/cascadia v1.2.0 // indirect
 	github.com/google/go-querystring v1.0.0 // indirect
 	github.com/plivo/plivo-go v4.9.1+incompatible
