@@ -40,3 +40,10 @@ type TrackedSectionRecord struct {
 	TotalSeats     string
 	Users          []string
 }
+
+// Meta is information about the service
+type Meta struct {
+	TotalTracked    int
+	TotalUsers      int
+	MessageOfTheDay string
+}

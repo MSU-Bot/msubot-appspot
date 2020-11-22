@@ -1,38 +1,40 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"os"
 
+	"github.com/SpencerCornish/msubot-appspot/server/endpoints"
+	"github.com/SpencerCornish/msubot-appspot/server/serverutils"
 	log "github.com/sirupsen/logrus"
+)
 
-	"github.com/SpencerCornish/msubot-appspot/server"
-	"github.com/SpencerCornish/msubot-appspot/server/checksections"
-	"github.com/SpencerCornish/msubot-appspot/server/healthcheck"
-	"github.com/SpencerCornish/msubot-appspot/server/messenger"
-	"github.com/SpencerCornish/msubot-appspot/server/pruner"
-	"github.com/SpencerCornish/msubot-appspot/server/scraper"
-	"github.com/SpencerCornish/msubot-appspot/server/tracksections"
+const (
+	portEnvVariable = "PORT"
+	defaultPort     = "8090"
 )
 
 func main() {
-	http.HandleFunc("/sections", scraper.HandleRequest)
-	http.HandleFunc("/welcomeuser", server.WelcomeUserHandler)
-	http.HandleFunc("/checktrackedsections", checksections.HandleRequest)
-	http.HandleFunc("/prunesections", pruner.HandleRequest)
-	http.HandleFunc("/receivemessage", messenger.RecieveMessage)
-	http.HandleFunc("/healthcheck", healthcheck.CheckHealth)
 
-	http.HandleFunc("/tracksections", tracksections.HandleRequest)
-	http.HandleFunc("/removetrackedsections", removetrackedsections.HandleRequest)
+	ctx, ctxCancel := context.WithCancel(context.Background())
+	defer ctxCancel()
 
-	port := os.Getenv("PORT")
+	firebaseClient := serverutils.GetFirebaseClient(ctx)
+
+	dataStore :=
+
+		log.Info("Defining http handlers...")
+	endpoints.DefineServiceHandlers()
+	log.Info("Defining http handlers... Done")
+
+	port := os.Getenv(portEnvVariable)
 	if port == "" {
-		port = "8090"
-		log.Printf("Defaulting to port %s", port)
+		port = defaultPort
+		log.Infof("Defaulting to port %s", port)
 	}
 
-	log.Printf("Listening on port %s", port)
+	log.Infof("Starting HTTP server on port %s", port)
 	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%s", port), nil))
 }
