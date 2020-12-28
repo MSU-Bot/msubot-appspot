@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/SpencerCornish/msubot-appspot/server/apihandler"
 	"github.com/SpencerCornish/msubot-appspot/server/endpoints"
 	"github.com/SpencerCornish/msubot-appspot/server/serverutils"
 	log "github.com/sirupsen/logrus"
@@ -23,9 +24,13 @@ func main() {
 
 	firebaseClient := serverutils.GetFirebaseClient(ctx)
 
-	dataStore :=
+	// datastore :=
 
-		log.Info("Defining http handlers...")
+	handler := apihandler.New(nil)
+
+	// dataStore :=
+
+	log.Info("Defining http handlers...")
 	endpoints.DefineServiceHandlers()
 	log.Info("Defining http handlers... Done")
 

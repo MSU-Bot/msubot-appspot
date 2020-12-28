@@ -27,23 +27,31 @@ type Section struct {
 
 // TrackedSectionRecord is a datastore record for tracked sections in firestore
 type TrackedSectionRecord struct {
-	CourseName     string
-	CourseNumber   string
-	CreationTime   time.Time
-	Crn            string
-	Department     string
-	DepartmentAbbr string
-	Instructor     string
-	OpenSeats      string
-	SectionNumber  int
-	Term           string
-	TotalSeats     string
-	Users          []string
+	ID string
+
+	CourseName     string    `firestore:"courseName"`
+	CourseNumber   string    `firestore:"courseNumber"`
+	CreationTime   time.Time `firestore:"creationTime"`
+	Crn            string    `firestore:"crn"`
+	Department     string    `firestore:"department"`
+	DepartmentAbbr string    `firestore:"departmentAbbr"`
+	Instructor     string    `firestore:"instructor"`
+	OpenSeats      string    `firestore:"openSeats"`
+	SectionNumber  int       `firestore:"sectionNumber"`
+	Term           string    `firestore:"term"`
+	TotalSeats     string    `firestore:"totalSeats"`
+	Users          []string  `firestore:"users"`
 }
 
 // Meta is information about the service
 type Meta struct {
-	TotalTracked    int
-	TotalUsers      int
-	MessageOfTheDay string
+	CoursesTracked int    `firestore:"coursesTracked"`
+	Users          int    `firestore:"users"`
+	TextsSent      int    `firestore:"textsSent"`
+	Motd           string `firestore:"motd"`
+}
+
+type DepartmentCourses struct {
+	CourseID string
+	Title    string
 }

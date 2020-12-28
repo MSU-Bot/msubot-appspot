@@ -3,13 +3,7 @@ package endpoints
 import (
 	"net/http"
 
-	"github.com/SpencerCornish/msubot-appspot/server/checksections"
-	"github.com/SpencerCornish/msubot-appspot/server/healthcheck"
-	"github.com/SpencerCornish/msubot-appspot/server/messenger"
-	"github.com/SpencerCornish/msubot-appspot/server/pruner"
-	"github.com/SpencerCornish/msubot-appspot/server/removetracked"
-	"github.com/SpencerCornish/msubot-appspot/server/scraper"
-	"github.com/SpencerCornish/msubot-appspot/server/tracksections"
+	"github.com/SpencerCornish/msubot-appspot/server/apihandler"
 )
 
 const (
@@ -26,7 +20,7 @@ const (
 	pruneTrackedSectionsEndpoint = "/cron/prunetrackedsections"
 
 	// Service communications
-	recieveSMSEndpoint = "/service/recievesms"
+	receiveSMSEndpoint = "/service/receivesms"
 	healthEndpoint     = "/service/health"
 
 	// User restricted
@@ -35,52 +29,52 @@ const (
 	removeTrackedSectionsEndpoint = "/user/removetracked"
 )
 
-func DefineServiceHandlers() {
+func DefineServiceHandlers(handler apihandler.ApiHandler) {
+
+	// https://msu-bot.uc.r.appspot.com/
+
+	// Request URL: https://msu-bot.appspot.com/sections?dept=CSCI&course=112&term=202130
 
 	// GLOBAL
 
 	// Returns info about msubot
-	http.HandleFunc(getMetaEndpoint, meta.GetMeta)
+	http.HandleFunc(getMetaEndpoint, handler.GetMeta)
 
 	// Returns a list of departments
-	http.HandleFunc(getDepartmentsEndpoint, meta.GetDepartments)
+	http.HandleFunc(getDepartmentsEndpoint, handler.GetDepartments)
 
 	// Returns course names and numbers for a given department and term
-	http.HandleFunc(getCoursesForDeptEndpoint, meta.GetCoursesForDept)
+	http.HandleFunc(getCoursesForDeptEndpoint, handler.GetCoursesForDept)
 
 	// The Sections endpoint returns section metadata for a certain term, department, and course
-	http.HandleFunc(getSectionsEndpoint, scraper.HandleRequest)
+	http.HandleFunc(getSectionsEndpoint, handler.GetSections)
 
 	// CRON
 
 	// the checktrackedsections is run by the cron, and is what does the actual notifying
-	http.HandleFunc(checkTrackedSectionsEndpoint, checksections.HandleRequest)
+	http.HandleFunc(checkTrackedSectionsEndpoint, handler.CheckTrackedSections)
 
 	// The prunesections endpoint is run by the cron, and cleans up any classes from previous semesters
 	// that do not need to be tracked anymore
-	http.HandleFunc(pruneTrackedSectionsEndpoint, pruner.HandleRequest)
+	http.HandleFunc(pruneTrackedSectionsEndpoint, handler.PruneTrackedSections)
 
 	// SERVICE
 
-	// The recievemessage endpoint responds to incoming text messages
-	http.HandleFunc(recieveSMSEndpoint, messenger.RecieveMessage)
+	// The receivemessage endpoint responds to incoming text messages
+	http.HandleFunc(receiveSMSEndpoint, handler.ReceiveSMS)
 
 	// The healthcheck endpoint reports the service's current state, as well as the latency to MSU
-	http.HandleFunc(healthEndpoint, healthcheck.CheckHealth)
+	http.HandleFunc(healthEndpoint, handler.HealthCheck)
 
 	// USER
 
 	// The Sections endpoint returns section metadata for a certain term, department, and course
-	http.HandleFunc(getUserSectionsEndpoint, scraper.HandleRequest)
+	http.HandleFunc(getUserSectionsEndpoint, handler.GetUserSections)
 
 	// The tracksections endpoint signs an authenticated user up for notifications for sections
-	http.HandleFunc(trackSectionsEndpoint, tracksections.HandleRequest)
+	http.HandleFunc(trackSectionsEndpoint, handler.TrackSections)
 
 	// The removetracked endpoint is used to remove tracked sections from a user
-	http.HandleFunc(removeTrackedSectionsEndpoint, removetracked.HandleRequest)
-
-}
-
-func defineInternalHandlers() {
+	http.HandleFunc(removeTrackedSectionsEndpoint, handler.RemoveTrackedSections)
 
 }
