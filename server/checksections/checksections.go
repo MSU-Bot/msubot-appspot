@@ -135,7 +135,7 @@ func sectionCheckWorker(ctx context.Context, jobs <-chan *firestore.DocumentSnap
 		}
 
 		// Parse into a section struct
-		newSectionData, err := serverutils.ParseSectionResponse(resp, crn)
+		newSectionData, err := serverutils.ParseSectionResponse(resp, term, crn)
 		if err != nil {
 			log.WithContext(ctx).Errorf("Parsing section failed: %v", err)
 

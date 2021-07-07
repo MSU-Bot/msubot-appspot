@@ -42,7 +42,7 @@ func HandleRequest(w http.ResponseWriter, r *http.Request) {
 
 	start := time.Now()
 
-	sections, err := serverutils.ParseSectionResponse(response, "")
+	sections, err := serverutils.ParseSectionResponse(response, term[0], "")
 
 	elapsed := time.Since(start)
 	log.WithContext(ctx).Infof("Scrape time: %v", elapsed.String())

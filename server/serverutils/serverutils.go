@@ -50,7 +50,7 @@ func buildAtlasRequestBody(term, department, course string) io.Reader {
 }
 
 // ParseSectionResponse turns the http.Response into a slice of sections
-func ParseSectionResponse(response *http.Response, crnToFind string) ([]models.Section, error) {
+func ParseSectionResponse(response *http.Response, termString, crnToFind string) ([]models.Section, error) {
 	sections := []models.Section{}
 	doc, err := goquery.NewDocumentFromReader(response.Body)
 	if err != nil {
@@ -70,6 +70,7 @@ func ParseSectionResponse(response *http.Response, crnToFind string) ([]models.S
 			}
 
 			newSection := models.Section{
+				Term:           termString,
 				DeptAbbr:       matches[0],
 				CourseNumber:   matches[1],
 				SectionNumber:  matches[2],
