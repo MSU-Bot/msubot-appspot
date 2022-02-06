@@ -104,7 +104,7 @@ func (f fbDStore) UpdateSection(ctx context.Context, sectionID string, atlasSect
 	return err
 }
 
-func (f fbDStore) GetSectionsForUser(ctx context.Context, uid string) ([]models.TrackedSectionRecord, error) {
+func (f fbDStore) GetTrackedSectionsForUser(ctx context.Context, uid string) ([]models.TrackedSectionRecord, error) {
 	data, err := f.fbClient.Collection("sections_tracked").Where("users", "array-contains", uid).Documents(ctx).GetAll()
 	if err != nil {
 		return nil, err
@@ -115,6 +115,15 @@ func (f fbDStore) GetSectionsForUser(ctx context.Context, uid string) ([]models.
 
 func (f fbDStore) GetAllTrackedSections(ctx context.Context) ([]models.TrackedSectionRecord, error) {
 	data, err := f.fbClient.Collection("sections_tracked").Documents(ctx).GetAll()
+	if err != nil {
+		return nil, err
+	}
+
+	return trackedSectionDocsToModels(data)
+}
+
+func (f fbDStore) GetTrackedSectionsBeforeTerm(ctx context.Context, termCondition string) ([]models.TrackedSectionRecord, error) {
+	data, err := f.fbClient.Collection("sections_tracked").Where("term", "<=", termCondition).Documents(ctx).GetAll()
 	if err != nil {
 		return nil, err
 	}

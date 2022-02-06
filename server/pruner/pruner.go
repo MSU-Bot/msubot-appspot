@@ -2,32 +2,42 @@ package pruner
 
 import (
 	"fmt"
-	"net/http"
 	"time"
 
-	"github.com/SpencerCornish/msubot-appspot/server/serverutils"
+	"github.com/SpencerCornish/msubot-appspot/server/dstore"
+	"github.com/labstack/echo/v4"
 	log "github.com/sirupsen/logrus"
 )
 
 // HandleRequest is run daily to clean up expired course checkers from old semesters.
-func HandleRequest(w http.ResponseWriter, r *http.Request) {
+func HandleRequest(ctx echo.Context, ds dstore.DStore) error {
+	writer := ctx.Response().Writer
 
-	ctx := r.Context()
-	log.WithContext(ctx).Infof("Context loaded. Starting execution.")
+	rCtx := ctx.Request().Context()
+	defer rCtx.Done()
 
-	if r.Header.Get("X-Appengine-Cron") == "" {
-		log.Warningf(ctx, "Request is not from the cron! Exiting")
-		w.WriteHeader(403)
-		return
+	term := getPruneTerm()
+
+	log.WithContext(rCtx).Infof("Removing all trackedsections where term <= %s", term)
+	// Get the list of sections we are actively tracking
+	oldTrackedSections, err := ds.GetTrackedSectionsBeforeTerm(rCtx, term)
+	if err != nil {
+		log.WithContext(rCtx).WithError(err).Error("Unable to retrieve old tracked sections")
+		writer.WriteHeader(500)
+		return err
 	}
 
-	fbClient := serverutils.GetFirebaseClient(ctx)
-	if fbClient == nil {
-		w.WriteHeader(500)
-		return
-	}
-	defer fbClient.Close()
+	log.WithContext(rCtx).Infof("Number of expired courses: %d", len(oldTrackedSections))
 
+	ids := make([]string, len(oldTrackedSections))
+	for i, section := range oldTrackedSections {
+		ids[i] = section.ID
+	}
+
+	return ds.MoveTrackedSectionsToArchive(rCtx, ids)
+}
+
+func getPruneTerm() string {
 	now := time.Now()
 	term := "00"
 	year := now.Year()
@@ -43,40 +53,5 @@ func HandleRequest(w http.ResponseWriter, r *http.Request) {
 		// If our current month is April or greater, remove spring (year) and before
 		term = fmt.Sprintf("%d%d", year, 30)
 	}
-
-	log.WithContext(ctx).Infof("Removing all trackedsections where term <= %s", term)
-	// Get the list of sections we are actively tracking
-	sectionsSnapshot := fbClient.Collection("sections_tracked").Where("term", "<=", term).Documents(ctx)
-
-	expiredSectionDocs, err := sectionsSnapshot.GetAll()
-	if err != nil {
-		log.WithContext(ctx).Errorf("Unable to retrieve expired sections!")
-		w.WriteHeader(500)
-		return
-	}
-
-	log.WithContext(ctx).Infof("Number of expired courses: %d", len(expiredSectionDocs))
-	for _, doc := range expiredSectionDocs {
-		data := doc.Data()
-
-		// Type conversions
-		term, ok := data["term"].(string)
-		if !ok {
-			log.WithContext(ctx).Errorf("type conv failed for courseNumber. Could not prune %s", doc.Ref.ID)
-			continue
-		}
-		// Type conversions
-		crn, ok := data["crn"].(string)
-		if !ok {
-			log.WithContext(ctx).Errorf("type conv failed for crn. Could not prune %s", doc.Ref.ID)
-			continue
-		}
-
-		log.WithContext(ctx).Infof("Moving Expired doc with uid %s because term was %v ", doc.Ref.ID, data["term"])
-
-		err := serverutils.MoveTrackedSection(ctx, fbClient, crn, doc.Ref.ID, term)
-		if err != nil {
-			log.WithContext(ctx).Errorf("Unable to move doc with UID: %s", doc.Ref.ID)
-		}
-	}
+	return term
 }

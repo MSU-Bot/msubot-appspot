@@ -17,19 +17,11 @@ import (
 
 // HandleRequest runs often to check for open seats
 func HandleRequest(ctx echo.Context, ds dstore.DStore) error {
-	req := ctx.Request()
 	writer := ctx.Response().Writer
 	client := http.DefaultClient
 
 	rCtx := ctx.Request().Context()
 	defer rCtx.Done()
-
-	// Make sure the request is from the appengine cron
-	if req.Header.Get("X-Appengine-Cron") == "" {
-		log.WithContext(rCtx).Warningf("Request is not from the cron. Exiting")
-		writer.WriteHeader(403)
-		return errors.New("request not from Appengine Cron")
-	}
 
 	// Get the list of sections we are actively tracking
 	trackedSections, err := ds.GetAllTrackedSections(rCtx)
