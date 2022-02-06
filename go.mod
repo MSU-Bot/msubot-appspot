@@ -7,6 +7,8 @@ require (
 	firebase.google.com/go v3.13.0+incompatible
 	github.com/PuerkitoBio/goquery v1.6.0
 	github.com/andybalholm/cascadia v1.2.0 // indirect
+	github.com/deepmap/oapi-codegen v1.4.2
+	github.com/labstack/echo/v4 v4.1.11
 	github.com/plivo/plivo-go v5.5.1+incompatible
 	github.com/sirupsen/logrus v1.7.0
 	github.com/stretchr/testify v1.6.1

@@ -7,7 +7,6 @@ import (
 	"os"
 
 	"github.com/SpencerCornish/msubot-appspot/server/apihandler"
-	"github.com/SpencerCornish/msubot-appspot/server/endpoints"
 	"github.com/SpencerCornish/msubot-appspot/server/serverutils"
 	log "github.com/sirupsen/logrus"
 )

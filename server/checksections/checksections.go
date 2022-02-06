@@ -8,6 +8,7 @@ import (
 
 	"github.com/SpencerCornish/msubot-appspot/server/models"
 	"github.com/SpencerCornish/msubot-appspot/server/serverutils"
+	"github.com/labstack/echo/v4"
 
 	"cloud.google.com/go/firestore"
 
@@ -15,13 +16,13 @@ import (
 )
 
 // HandleRequest runs often to check for open seats
-func HandleRequest(w http.ResponseWriter, r *http.Request) {
+func HandleRequest(ctx echo.Context) error {
 
 	// Load up a context and http client
-	ctx := r.Context()
+	rCtx := ctx.Request().Context()
 	client := http.DefaultClient
 
-	log.WithContext(ctx).Infof("Context loaded. Starting execution.")
+	log.WithContext(rCtx).Infof("Context loaded. Starting execution.")
 
 	// Make sure the request is from the appengine cron
 	// if r.Header.Get("X-Appengine-Cron") == "" {

@@ -1,0 +1,542 @@
+openapi: 3.0.0
+servers:
+  # Added by API Auto Mocking Plugin
+  - description: SwaggerHub API Auto Mocking
+    url: https://virtserver.swaggerhub.com/MSUBot/MSUBot-Appengine/1.0.0
+  - description: MSUBot Prod Instance
+    url: https://msu-bot.uc.r.appspot.com/1.0.0
+info:
+  description: The API for MSUBot
+  version: "1.0.0"
+  title: MSUBot-Appengine
+  contact:
+    email: me@spen.cc
+  license:
+    name: Apache 2.0
+    url: 'http://www.apache.org/licenses/LICENSE-2.0.html'
+tags:
+  - name: service
+    description: Secured server-to-server only calls
+  - name: cron
+    description: Calls only available to Appengine cron
+  - name: users
+    description: Operations available to authenticated users
+  - name: everyone
+    description: Calls available without authentication
+paths:
+
+  # # # # # # # # # # # # # # # 
+  # Globally accessible paths
+  # # # # # # # # # # # # # # # 
+
+  /meta:
+    get:
+      tags:
+        - everyone
+      summary: Gets general info about the web app
+      operationId: getMeta
+      description: |
+        Returns metadata, such as server statistics, for the homepage of MSUBot
+      responses:
+        '200':
+          description: "A valid response"
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Meta'
+  /departments:
+    get:
+      tags:
+        - everyone
+      summary: Gets the list of departments at MSU
+      operationId: getDepartments
+      description: |
+        Returns the list of departments for MSU, used to populate the list on the homepage
+      responses:
+        '200':
+          description: "A valid response"
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+                  
+  
+  /department/courses:
+    get:
+      tags:
+        - everyone
+      summary: Gets the courses for a department
+      operationId: getCoursesForDepartment
+      description: |
+        Returns the known courses for a department for a given term
+      parameters:
+        - in: query
+          name: term
+          description: Semester code in the format `{Year}{30|50|70}`
+          example: "202030"
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: deptAbbr
+          description: Short name for department
+          example: "COMX"
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: "Courses were found"
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  type: string
+
+  /sections:
+    get:
+      tags:
+        - everyone
+      summary: Gets the sections for a course
+      operationId: getSections
+      description: |
+        Scrapes ATLAS for sections for the given course information
+      parameters:
+        - in: query
+          name: term
+          description: Semester code in the format `{Year}{30|50|70}`
+          example: "202030"
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: deptAbbr
+          description: Short name for department
+          example: "COMX"
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: course
+          description: Course "Number" (Also includes Core Tags, like RN)
+          example: "101IR"
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: "Sections were successfully found"
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Section'
+        '204':
+          description: "No sections were successfully found"
+        '502':
+          description: "Returned when Atlas is unreachable for some reason"
+      
+  # # # # # # # # # # # # #
+  # User accessible paths
+  # # # # # # # # # # # # #
+  
+  /users/{userID}:
+    get:
+      tags:
+        - users
+      summary: Gets user data for the specified user
+      operationId: getUserData
+      description: |
+        Gets the user's metadata from the service
+      security:
+        - bearerAuth: []
+      parameters: 
+        - in: path
+          name: userID
+          description: The unique identifier of the user
+          example: "A346CJISYFcwy7rZNP2Gclz5xx79"
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: "Successfully found userdata"
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+    put:
+      tags:
+        - users
+      summary: Updates or sets userdata for the user
+      operationId: updateUserData
+      description: |
+        Updates the user's metadata from the service
+      security:
+        - bearerAuth: []
+      parameters: 
+        - in: path
+          name: userID
+          description: The unique identifier of the user
+          example: "A346CJISYFcwy7rZNP2Gclz5xx79"
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: '#/components/schemas/User'  
+      responses:
+        '200':
+          description: "Successfully updated userdata"
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+  
+  
+  
+  
+  /users/{userID}/sections:
+    get:
+      tags:
+        - users
+      summary: Gets tracked sections for the specified user
+      operationId: getTrackedSectionsForUser
+      description: |
+        Gets the tracked sections for the specified user. User must be authenticated
+      security:
+        - bearerAuth: []
+      parameters: 
+        - in: path
+          name: userID
+          description: The unique identifier of the user
+          example: "A346CJISYFcwy7rZNP2Gclz5xx79"
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: "Successfully found tracked sections for the user"
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Section'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+    put:
+      tags:
+        - users
+      summary: Adds tracked sections for the specified user
+      operationId: addTrackedSectionsForUser
+      description: |
+        Adds the provided trackedSections for the specified, authed user
+      security:
+        - bearerAuth: []
+      parameters: 
+        - in: path
+          name: userID
+          description: The unique identifier of the user
+          example: "A346CJISYFcwy7rZNP2Gclz5xx79"
+          required: true
+          schema:
+            type: string   
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: '#/components/schemas/Section'  
+      responses:
+        '200':
+          description: "TrackedSection already existed, successfully added user"
+        '201':
+          description: "Successfully created new TrackedSection and added user"
+        '204':
+          description: "User previously added to TrackedSection"
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /users/{userID}/section/{sectionID}:
+    delete:
+      tags:
+        - users
+      summary: Removes the user from the specified section
+      operationId: removeTrackedSectionForUser
+      description: |
+        Removes the authed user from the specified section
+      security:
+        - bearerAuth: []
+      parameters: 
+        - in: path
+          name: userID
+          description: The unique identifier of the user
+          example: "A346CJISYFcwy7rZNP2Gclz5xx79"
+          required: true
+          schema:
+            type: string           
+        - in: path
+          name: sectionID
+          description: The unique identifier of the section
+          example: "--YFcwy7rZNP2Gclz5xx79"
+          required: true
+          schema:
+            type: string   
+      responses:
+        '200':
+          description: "User removed from tracked section"
+        '201':
+          description: "Successfully created new TrackedSection and added user"
+        '204':
+          description: "User previously added to TrackedSection"
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+
+  
+  
+  
+  # # # # # # # # # # # # # # # 
+  # Cron accessible paths
+  # # # # # # # # # # # # # # # 
+  
+  /cron/checktrackedsections:
+    get:
+      tags:
+        - cron
+      summary: Scrapes and notifies users of open seats
+      operationId: checkTrackedSections
+      description: |
+        Scrapes for updated course info, and notifies users as required
+      security:
+        - appengineApiAuth: []
+      responses:
+        '200':
+          description: "Successfully ran task"
+        '502':
+          description: "Issues acquiring new class metadata"
+        '500':
+          description: "Internal server error"
+  /cron/prunetrackedsections:
+    get:
+      tags:
+        - cron
+      summary: Cleans up any stale tracked sections
+      operationId: pruneTrackedSections
+      description: |
+        Cleans up any stale tracked sections, such as ones for classes which
+        do not exist, and ones which are too old to be checked
+      security:
+        - appengineApiAuth: []
+      responses:
+        '200':
+          description: "Successfully ran task"
+        '500':
+          description: "Internal server error"         
+        
+  # # # # # # # # # # # # # # # 
+  # Service accessible paths
+  # # # # # # # # # # # # # # # 
+  
+  /service/sms/receive:
+    post:
+      tags:
+        - service
+      summary: Receives SMS data
+      operationId: receiveSMS
+      description: |
+        Respond to incoming SMS messages
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              items:
+                $ref: '#/components/schemas/PlivoSMS'  
+      responses:
+        '200':
+          description: "OK"
+        '500':
+          description: "Internal server error"    
+
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    appengineApiAuth:       
+      type: apiKey
+      in: header      
+      name: X-Appengine-Cron
+
+  responses:
+    UnauthorizedError:
+      description: Access token is missing or invalid
+
+  schemas:
+    Section:
+      type: object
+      required:
+        - term
+        - deptAbbr
+        - courseNumber
+        
+      properties:
+        id:
+          type: string
+          description: "MSUBot internal identifier for this section, if it exists in the system"
+          example: "some_uid"
+        term:
+          type: string
+          description: Semester code in the format `{Year}{30|50|70|SNO}`
+          example: "202030"
+        deptAbbr:
+          type: string
+          example: "COMX"
+        courseName:
+          type: string
+          example: "Fish Studies II"
+        courseNumber:
+          type: string
+          example: "202PR"
+        courseType:
+          type: string
+          example: "Blended"
+        credits:
+          type: string
+          example: "3.0 - Online"
+        instructor:
+          type: string
+          example: "Paxton, John"
+        time:
+          type: string
+          example: "TTH1300-1420"
+        location:
+          type: string
+          example: "ROBH111"
+        sectionNumber:
+          type: string
+          example: "LAB - 01"
+        crn:
+          type: integer
+          example: 203031
+        totalSeats:
+          type: integer
+          example: 30
+        takenSeats:
+          type: integer
+          example: 4
+        availableSeats:
+          type: integer
+          example: -50
+        numUsers:
+          type: integer
+          example: 5
+    Meta:
+      type: object
+      required:
+        - coursesTracked
+        - users
+        - textsSent
+      properties:
+        coursesTracked:
+          type: integer
+          example: 450
+          description: "The total number of courses tracked by MSUBot users"
+        users:
+          type: integer
+          example: 450
+          description: "The total number of MSUBot users"
+        textsSent:
+          type: integer
+          example: 450
+          description: "The total number of texts sent to MSUBot users"
+        motd:
+          type: string
+          example: "Snowmester courses are now supported!"
+          description: "The text to be used on the header of of the homepage"
+    User:
+      type: object
+      required:
+        - userID
+        - number
+      properties:
+        userID:
+          type: string
+          example: "0EEe06KUmlhfoVRrwqtwxPK7anx2"
+          description: "The user's unique identifier"
+        number:
+          type: string
+          example: "+14065553442"
+          description: "The user's phone number"
+        welcomeSent:
+          type: boolean
+          example: true
+          description: "whether or not the user has recieved a welcome email/text"
+    PlivoSMS:
+      type: object
+      properties:
+        MessageUUID:
+          type: string
+          example: "0EEe06KUmlhfoVRrwqtwxPK7anx2"
+          description: "The unique identifier for the message"
+        From:
+          type: string
+          example: "+14065553442"
+          description: "The user's phone number"        
+        To:
+          type: string
+          example: "+14065553442"
+          description: "Number on which the message was received"
+        Text:
+          type: string
+          example: "LIST"
+          description: "Content of the message"
+        Type:
+          type: string
+          example: "sms"
+          description: "Type of the message"
+        Units:
+          type: integer
+          example: 2
+          description: "The number of parts in which the incoming message was received"
+        TotalRate:
+          type: string
+          example: "$0.002"
+          description: "The charge applicable per incoming SMS unit"
+        TotalAmount:
+          type: string
+          example: "$0.006"
+          description: "Total charge for receiving the SMS (TotalRate * No. of Units)"
+        MessageIntent:
+          type: string
+          example: "optout"
+          description: |
+            Set to optout if the incoming message matches with one of the standard Opt-Out keywords. Set to optin if the incoming message matches with one of the standard Opt-In keywords. Set to help if the incoming message matches with one of the standard Help keywords. Is left blank in all other cases.
+        PowerpackUUID:
+          type: string
+          example: "0EEe06KUmlhfoVRrwqtwxPK7anx2"
+          description: "The UUID of the Powerpack associated with the To phone number"
