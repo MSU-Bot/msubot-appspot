@@ -15,11 +15,11 @@ func HandleRequest(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	log.WithContext(ctx).Infof("Context loaded. Starting execution.")
 
-	// if r.Header.Get("X-Appengine-Cron") == "" {
-	// 	log.Warningf(ctx, "Request is not from the cron! Exiting")
-	// 	w.WriteHeader(403)
-	// 	return
-	// }
+	if r.Header.Get("X-Appengine-Cron") == "" {
+		log.Warningf(ctx, "Request is not from the cron! Exiting")
+		w.WriteHeader(403)
+		return
+	}
 
 	fbClient := serverutils.GetFirebaseClient(ctx)
 	if fbClient == nil {

@@ -87,6 +87,23 @@ func (f fbDStore) GetTrackedSection(ctx context.Context, term, departmentAbbr, c
 	return trackedSection, nil
 }
 
+func (f fbDStore) UpdateSection(ctx context.Context, sectionID string, atlasSection models.Section) error {
+	_, err := f.fbClient.Collection("sections_tracked").Doc(sectionID).Set(ctx, map[string]interface{}{
+		"courseName":     atlasSection.CourseName,
+		"courseNumber":   atlasSection.CourseNumber,
+		"crn":            atlasSection.Crn,
+		"department":     atlasSection.DeptName,
+		"departmentAbbr": atlasSection.DeptAbbr,
+		"instructor":     atlasSection.Instructor,
+		"openSeats":      atlasSection.AvailableSeats,
+		"sectionNumber":  atlasSection.SectionNumber,
+		"term":           atlasSection.Term,
+		"totalSeats":     atlasSection.TotalSeats,
+	}, firestore.MergeAll)
+
+	return err
+}
+
 func (f fbDStore) GetSectionsForUser(ctx context.Context, uid string) ([]models.TrackedSectionRecord, error) {
 	data, err := f.fbClient.Collection("sections_tracked").Where("users", "array-contains", uid).Documents(ctx).GetAll()
 	if err != nil {
@@ -103,6 +120,18 @@ func (f fbDStore) GetAllTrackedSections(ctx context.Context) ([]models.TrackedSe
 	}
 
 	return trackedSectionDocsToModels(data)
+}
+
+func (f fbDStore) GetUser(ctx context.Context, userID string) (*models.UserRecord, error) {
+	doc, err := f.fbClient.Collection("users").Doc(userID).Get(ctx)
+	if err != nil {
+		return nil, err
+	}
+	user, err := userDocToModel(doc)
+	if err != nil {
+		return nil, err
+	}
+	return user, nil
 }
 
 func (f fbDStore) MoveTrackedSectionsToArchive(ctx context.Context, sectionIDs []string) error {
@@ -205,4 +234,15 @@ func trackedSectionDocsToModels(data []*firestore.DocumentSnapshot) ([]models.Tr
 	}
 
 	return trackedSections, nil
+}
+
+func userDocToModel(data *firestore.DocumentSnapshot) (*models.UserRecord, error) {
+	user := &models.UserRecord{}
+	err := data.DataTo(user)
+	if err != nil {
+		// TODO: Decide on a better error
+		return nil, err
+	}
+
+	return user, nil
 }

@@ -51,6 +51,12 @@ type Meta struct {
 	Motd           string `firestore:"motd"`
 }
 
+type UserRecord struct {
+	ID          string
+	PhoneNumber string `firestore:"number"`
+	WelcomeSent bool   `firestore:"welcomeSent"`
+}
+
 type DepartmentCourses struct {
 	CourseID string
 	Title    string

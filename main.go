@@ -7,6 +7,7 @@ import (
 	"os"
 
 	"github.com/SpencerCornish/msubot-appspot/server/apihandler"
+	"github.com/SpencerCornish/msubot-appspot/server/dstore"
 	"github.com/SpencerCornish/msubot-appspot/server/serverutils"
 	log "github.com/sirupsen/logrus"
 )
@@ -25,7 +26,7 @@ func main() {
 
 	// datastore :=
 
-	handler := apihandler.New(nil)
+	handler := apihandler.New(dstore.New(*firebaseClient))
 
 	// dataStore :=
 

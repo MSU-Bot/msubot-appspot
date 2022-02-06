@@ -1,7 +1,7 @@
 package apihandler
 
 import (
-	"github.com/SpencerCornish/msubot-appspot/server/datastore"
+	"github.com/SpencerCornish/msubot-appspot/server/checksections"
 	"github.com/SpencerCornish/msubot-appspot/server/dstore"
 	"github.com/SpencerCornish/msubot-appspot/server/gen/api"
 	"github.com/labstack/echo/v4"
@@ -11,12 +11,13 @@ type serverInterface struct {
 	datastore dstore.DStore
 }
 
-func New(ds datastore.DataStore) api.ServerInterface {
+func New(ds dstore.DStore) api.ServerInterface {
 	return serverInterface{datastore: ds}
 }
 
 func (s serverInterface) CheckTrackedSections(ctx echo.Context) error {
-	panic("implement me")
+	err := checksections.HandleRequest(ctx, s.datastore)
+	return err
 }
 
 func (s serverInterface) PruneTrackedSections(ctx echo.Context) error {
