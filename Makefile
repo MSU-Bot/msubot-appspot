@@ -12,4 +12,4 @@ deploy-prod:
 
 
 generate:
-	go generate
+	go generate ./...
