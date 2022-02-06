@@ -1,0 +1,5 @@
+output:
+  msubot-types.gen.go
+generate:
+  - types
+package: api

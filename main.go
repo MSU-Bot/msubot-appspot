@@ -3,12 +3,13 @@ package main
 import (
 	"context"
 	"fmt"
-	"net/http"
 	"os"
 
-	"github.com/SpencerCornish/msubot-appspot/server/apihandler"
+	"github.com/SpencerCornish/msubot-appspot/server/api"
 	"github.com/SpencerCornish/msubot-appspot/server/dstore"
 	"github.com/SpencerCornish/msubot-appspot/server/serverutils"
+	"github.com/labstack/echo/v4"
+	echoMiddleware "github.com/labstack/echo/v4/middleware"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -18,28 +19,37 @@ const (
 )
 
 func main() {
-
-	ctx, ctxCancel := context.WithCancel(context.Background())
-	defer ctxCancel()
-
-	firebaseClient := serverutils.GetFirebaseClient(ctx)
-
-	// datastore :=
-
-	handler := apihandler.New(dstore.New(*firebaseClient))
-
-	// dataStore :=
-
-	log.Info("Defining http handlers...")
-	endpoints.DefineServiceHandlers()
-	log.Info("Defining http handlers... Done")
-
 	port := os.Getenv(portEnvVariable)
 	if port == "" {
 		port = defaultPort
 		log.Infof("Defaulting to port %s", port)
 	}
 
-	log.Infof("Starting HTTP server on port %s", port)
-	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%s", port), nil))
+	firebaseClient := serverutils.GetFirebaseClient(context.Background())
+
+	// Get the API Spec (for validation)
+	swagger, err := api.GetSwagger()
+	if err != nil {
+		log.WithError(err).Fatal("Failed to load swagger spec")
+	}
+	swagger.Servers = nil
+
+	msubotAPI := api.New(dstore.New(*firebaseClient))
+
+	ec := echo.New()
+	ec.Use(echoMiddleware.Logger())
+
+	api.RegisterHandlers(ec, msubotAPI)
+
+	ec.Logger.Fatal(ec.Start(fmt.Sprintf("0.0.0.0:%d", port)))
 }
+
+// func RegisterHandlers(router codegen.EchoRouter, si ServerInterface) {
+// 	wrapper := ServerInterfaceWrapper{
+// 		Handler: si,
+// 	}
+// 	router.GET("/pets", wrapper.FindPets)
+// 	router.POST("/pets", wrapper.AddPet)
+// 	router.DELETE("/pets/:id", wrapper.DeletePet)
+// 	router.GET("/pets/:id", wrapper.FindPetById)
+// }

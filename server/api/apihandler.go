@@ -1,4 +1,4 @@
-package apihandler
+package api
 
 import (
 	"net/http"
@@ -7,18 +7,20 @@ import (
 
 	"github.com/SpencerCornish/msubot-appspot/server/checksections"
 	"github.com/SpencerCornish/msubot-appspot/server/dstore"
-	"github.com/SpencerCornish/msubot-appspot/server/gen/api"
 	"github.com/SpencerCornish/msubot-appspot/server/mauth"
 	"github.com/SpencerCornish/msubot-appspot/server/messenger"
 	"github.com/SpencerCornish/msubot-appspot/server/pruner"
 	"github.com/SpencerCornish/msubot-appspot/server/scraper"
 )
 
+//go:generate go run github.com/deepmap/oapi-codegen/cmd/oapi-codegen --config=types.cfg.yaml ../../api/MSUBot-Appengine-1.0.0.yaml
+//go:generate go run github.com/deepmap/oapi-codegen/cmd/oapi-codegen --config=server.cfg.yaml ../../api/MSUBot-Appengine-1.0.0.yaml
+
 type serverInterface struct {
 	datastore dstore.DStore
 }
 
-func New(ds dstore.DStore) api.ServerInterface {
+func New(ds dstore.DStore) ServerInterface {
 	return serverInterface{datastore: ds}
 }
 
@@ -45,7 +47,7 @@ func (s serverInterface) ReceiveSMS(ctx echo.Context) error {
 }
 
 // Public API
-func (s serverInterface) GetCoursesForDepartment(ctx echo.Context, params api.GetCoursesForDepartmentParams) error {
+func (s serverInterface) GetCoursesForDepartment(ctx echo.Context, params GetCoursesForDepartmentParams) error {
 	courses, err := s.datastore.GetCoursesForDepartment(ctx.Request().Context(), params.Term, params.DeptAbbr)
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, nil)
@@ -72,7 +74,7 @@ func (s serverInterface) GetMeta(ctx echo.Context) error {
 	return ctx.JSON(http.StatusOK, *meta)
 }
 
-func (s serverInterface) GetSections(ctx echo.Context, params api.GetSectionsParams) error {
+func (s serverInterface) GetSections(ctx echo.Context, params GetSectionsParams) error {
 	return scraper.HandleRequest(ctx, params.Term, params.DeptAbbr, params.Course)
 }
 
