@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strconv"
 
 	"github.com/SpencerCornish/msubot-appspot/server/api"
 	"github.com/SpencerCornish/msubot-appspot/server/dstore"
@@ -41,7 +42,12 @@ func main() {
 
 	api.RegisterHandlers(ec, msubotAPI)
 
-	ec.Logger.Fatal(ec.Start(fmt.Sprintf("0.0.0.0:%d", port)))
+	portInt, err := strconv.Atoi(port)
+	if err != nil {
+		log.WithError(err).Fatal("Could not parse port as int")
+	}
+
+	ec.Logger.Fatal(ec.Start(fmt.Sprintf("0.0.0.0:%d", portInt)))
 }
 
 // func RegisterHandlers(router codegen.EchoRouter, si ServerInterface) {

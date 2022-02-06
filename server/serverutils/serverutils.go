@@ -27,10 +27,10 @@ func MakeAtlasSectionRequest(client *http.Client, term, dept, course string) (*h
 	body := buildAtlasRequestBody(term, dept, course)
 
 	req, err := http.NewRequest("POST", sectionRequestURL, body)
-	defer req.Body.Close()
 	if err != nil {
 		return nil, err
 	}
+	defer req.Body.Close()
 
 	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 	resp, err := client.Do(req)
@@ -188,16 +188,18 @@ func GetFirebaseClient(ctx context.Context) *firestore.Client {
 	firebasePID := os.Getenv("FIREBASE_PROJECT")
 	log.WithContext(ctx).Infof("Loaded firebase project ID.")
 	if firebasePID == "" {
-		log.WithContext(ctx).Errorf("Firebase Project ID is nil, I cannot continue.")
-		panic("Firebase Project ID is nil")
+		log.WithContext(ctx).Fatal("Firebase Project ID is nil, I cannot continue.")
 	}
 
 	fbClient, err := firestore.NewClient(ctx, firebasePID)
 	if err != nil {
-		log.WithContext(ctx).WithError(err).Errorf("Could not create new client for Firebase")
-		return nil
+		log.WithContext(ctx).WithError(err).Fatal("Could not create new client for Firebase")
 	}
 	log.WithContext(ctx).Infof("successfully opened firestore client")
+
+	if value := os.Getenv("FIRESTORE_EMULATOR_HOST"); value != "" {
+		log.Warningf("Using Firestore Emulator: %s", value)
+	}
 
 	return fbClient
 }

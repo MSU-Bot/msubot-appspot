@@ -10,8 +10,8 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-// RecieveMessage handles ingest of SMS messages from plivo
-func RecieveMessage(ctx echo.Context) {
+// ReceiveMessage handles ingest of SMS messages from plivo
+func ReceiveMessage(ctx echo.Context) {
 	r := ctx.Request()
 
 	if err := r.ParseForm(); err != nil {
@@ -26,7 +26,7 @@ func RecieveMessage(ctx echo.Context) {
 	if strings.Contains(text, "HELP") {
 		responseText = "Available Commands:\nHELP - prints this help message\nLIST - lists your tracked classes and their seats"
 	} else if strings.Contains(text, "LIST") {
-		responseText = "LIST is currently undergoing maintenence, please check the website for class status"
+		responseText = "LIST is currently undergoing maintenance, please check the website for class status"
 		// fbClient := serverutils.GetFirebaseClient(ctx)
 		// _, uid := serverutils.FetchUserDataWithNumber(ctx, fbClient, from)
 

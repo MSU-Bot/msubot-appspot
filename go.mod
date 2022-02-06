@@ -13,4 +13,5 @@ require (
 	github.com/plivo/plivo-go v5.5.1+incompatible
 	github.com/sirupsen/logrus v1.7.0
 	github.com/stretchr/testify v1.6.1
+	google.golang.org/api v0.36.0
 )

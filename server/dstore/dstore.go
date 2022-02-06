@@ -19,7 +19,7 @@ type DStore interface {
 
 	UpdateSection(ctx context.Context, sectionID string, atlasSection models.Section) error
 
-	MoveTrackedSectionsToArchive(ctx context.Context, uids []string) error
+	MoveTrackedSectionsToArchive(ctx context.Context, UIDs []string) error
 	AddUserToExistingTrackedSection(ctx context.Context, userUID, sectionID string) error
 	AddNewTrackedSection(ctx context.Context, sectionRecord models.TrackedSectionRecord) (*models.TrackedSectionRecord, error)
 }

@@ -5,12 +5,14 @@ servers:
     url: https://virtserver.swaggerhub.com/MSUBot/MSUBot-Appengine/1.0.0
   - description: MSUBot Prod Instance
     url: https://msu-bot.uc.r.appspot.com/1.0.0
+  - description: Local testing
+    url: localhost:8090
 info:
   description: The API for MSUBot
   version: "1.0.0"
   title: MSUBot-Appengine
   contact:
-    email: me@spen.cc
+    email: msubot@spen.cc
   license:
     name: Apache 2.0
     url: 'http://www.apache.org/licenses/LICENSE-2.0.html'
@@ -43,9 +45,16 @@ paths:
           content:
             application/json:
               schema:
-                type: array
+                type: object
                 items:
                   $ref: '#/components/schemas/Meta'
+        default:
+          description: error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
   /departments:
     get:
       tags:
@@ -62,7 +71,13 @@ paths:
               schema:
                 type: array
                 items:
-                  type: string
+                  $ref: '#/components/schemas/Department'
+        default:
+          description: error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
                   
   
   /department/courses:
@@ -94,9 +109,17 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                additionalProperties:
-                  type: string
+                type: array
+                items:
+                  $ref: '#/components/schemas/DepartmentCourse'
+        '404':
+          description: "No courses/department found"
+        default:
+          description: error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
 
   /sections:
     get:
@@ -137,10 +160,12 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/Section'
-        '204':
-          description: "No sections were successfully found"
-        '502':
-          description: "Returned when Atlas is unreachable for some reason"
+        default:
+          description: error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
       
   # # # # # # # # # # # # #
   # User accessible paths
@@ -173,8 +198,12 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/User'
-        '401':
-          $ref: '#/components/responses/UnauthorizedError'
+        default:
+          description: error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
     put:
       tags:
         - users
@@ -208,8 +237,12 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/User'
-        '401':
-          $ref: '#/components/responses/UnauthorizedError'
+        default:
+          description: error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   
   
   
@@ -241,8 +274,12 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/Section'
-        '401':
-          $ref: '#/components/responses/UnauthorizedError'
+        default:
+          description: error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
 
     put:
       tags:
@@ -275,8 +312,12 @@ paths:
           description: "Successfully created new TrackedSection and added user"
         '204':
           description: "User previously added to TrackedSection"
-        '401':
-          $ref: '#/components/responses/UnauthorizedError'
+        default:
+          description: error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
 
   /users/{userID}/section/{sectionID}:
     delete:
@@ -306,12 +347,12 @@ paths:
       responses:
         '200':
           description: "User removed from tracked section"
-        '201':
-          description: "Successfully created new TrackedSection and added user"
-        '204':
-          description: "User previously added to TrackedSection"
-        '401':
-          $ref: '#/components/responses/UnauthorizedError'
+        default:
+          description: error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
 
 
   
@@ -334,10 +375,12 @@ paths:
       responses:
         '200':
           description: "Successfully ran task"
-        '502':
-          description: "Issues acquiring new class metadata"
-        '500':
-          description: "Internal server error"
+        default:
+          description: error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /cron/prunetrackedsections:
     get:
       tags:
@@ -352,8 +395,12 @@ paths:
       responses:
         '200':
           description: "Successfully ran task"
-        '500':
-          description: "Internal server error"         
+        default:
+          description: error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'         
         
   # # # # # # # # # # # # # # # 
   # Service accessible paths
@@ -377,8 +424,12 @@ paths:
       responses:
         '200':
           description: "OK"
-        '500':
-          description: "Internal server error"    
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
 
 
 components:
@@ -478,6 +529,34 @@ components:
           type: string
           example: "Snowmester courses are now supported!"
           description: "The text to be used on the header of of the homepage"
+    DepartmentCourse:
+      type: object
+      required:
+        - courseID
+        - title
+      properties:
+        courseID:
+          type: string
+          example: "450IN"
+          description: "The course number/identifier (contains CORE notation)"
+        title:
+          type: string
+          example: "Intro to Java I"
+          description: "The name of the course"
+    Department:
+      type: object
+      required:
+        - abbreviation
+        - name
+      properties:
+        abbreviation:
+          type: string
+          example: "COMX"
+          description: "The abbreviated form of the department name"
+        name:
+          type: string
+          example: "Computer Science"
+          description: "The full name of the department"
     User:
       type: object
       required:
@@ -492,6 +571,9 @@ components:
           type: string
           example: "+14065553442"
           description: "The user's phone number"
+        email:
+          type: string
+          example: "example@example.cc"
         welcomeSent:
           type: boolean
           example: true
@@ -540,3 +622,15 @@ components:
           type: string
           example: "0EEe06KUmlhfoVRrwqtwxPK7anx2"
           description: "The UUID of the Powerpack associated with the To phone number"
+    Error:
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: integer
+          format: int32
+          description: Error code
+        message:
+          type: string
+          description: Error message

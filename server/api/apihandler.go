@@ -42,7 +42,7 @@ func (s serverInterface) PruneTrackedSections(ctx echo.Context) error {
 }
 
 func (s serverInterface) ReceiveSMS(ctx echo.Context) error {
-	messenger.RecieveMessage(ctx)
+	messenger.ReceiveMessage(ctx)
 	return nil
 }
 
@@ -71,6 +71,7 @@ func (s serverInterface) GetMeta(ctx echo.Context) error {
 		ctx.JSON(http.StatusInternalServerError, nil)
 	}
 
+	// TODO: Null handling here
 	return ctx.JSON(http.StatusOK, *meta)
 }
 
