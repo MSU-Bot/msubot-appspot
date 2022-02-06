@@ -5,6 +5,7 @@ import (
 	"github.com/SpencerCornish/msubot-appspot/server/dstore"
 	"github.com/SpencerCornish/msubot-appspot/server/gen/api"
 	"github.com/SpencerCornish/msubot-appspot/server/mauth"
+	"github.com/SpencerCornish/msubot-appspot/server/messenger"
 	"github.com/SpencerCornish/msubot-appspot/server/pruner"
 	"github.com/labstack/echo/v4"
 )
@@ -35,7 +36,8 @@ func (s serverInterface) PruneTrackedSections(ctx echo.Context) error {
 }
 
 func (s serverInterface) ReceiveSMS(ctx echo.Context) error {
-	panic("implement me")
+	messenger.RecieveMessage(ctx)
+	return nil
 }
 
 // Public API
