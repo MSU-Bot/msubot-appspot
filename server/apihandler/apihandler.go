@@ -1,13 +1,17 @@
 package apihandler
 
 import (
+	"net/http"
+
+	"github.com/labstack/echo/v4"
+
 	"github.com/SpencerCornish/msubot-appspot/server/checksections"
 	"github.com/SpencerCornish/msubot-appspot/server/dstore"
 	"github.com/SpencerCornish/msubot-appspot/server/gen/api"
 	"github.com/SpencerCornish/msubot-appspot/server/mauth"
 	"github.com/SpencerCornish/msubot-appspot/server/messenger"
 	"github.com/SpencerCornish/msubot-appspot/server/pruner"
-	"github.com/labstack/echo/v4"
+	"github.com/SpencerCornish/msubot-appspot/server/scraper"
 )
 
 type serverInterface struct {
@@ -42,23 +46,37 @@ func (s serverInterface) ReceiveSMS(ctx echo.Context) error {
 
 // Public API
 func (s serverInterface) GetCoursesForDepartment(ctx echo.Context, params api.GetCoursesForDepartmentParams) error {
-	panic("implement me")
+	courses, err := s.datastore.GetCoursesForDepartment(ctx.Request().Context(), params.Term, params.DeptAbbr)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, nil)
+	}
+
+	return ctx.JSON(http.StatusOK, courses)
 }
 
 func (s serverInterface) GetDepartments(ctx echo.Context) error {
-	panic("implement me")
+	departments, err := s.datastore.GetDepartments(ctx.Request().Context())
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, nil)
+	}
+
+	return ctx.JSON(http.StatusOK, departments)
 }
 
 func (s serverInterface) GetMeta(ctx echo.Context) error {
-	panic("implement me")
+	meta, err := s.datastore.GetMeta(ctx.Request().Context())
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, nil)
+	}
+
+	return ctx.JSON(http.StatusOK, *meta)
 }
 
 func (s serverInterface) GetSections(ctx echo.Context, params api.GetSectionsParams) error {
-	panic("implement me")
+	return scraper.HandleRequest(ctx, params.Term, params.DeptAbbr, params.Course)
 }
 
 // Authenticated API
-
 func (s serverInterface) GetUserData(ctx echo.Context, userID string) error {
 	// 	_, err := mauth.VerifyToken(ctx)
 

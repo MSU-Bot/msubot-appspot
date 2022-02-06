@@ -1,69 +1,53 @@
 package scraper
 
 import (
-	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"time"
 
 	"github.com/SpencerCornish/msubot-appspot/server/serverutils"
+	"github.com/labstack/echo/v4"
 	log "github.com/sirupsen/logrus"
 )
 
 // HandleRequest scrapes
-func HandleRequest(w http.ResponseWriter, r *http.Request) {
+func HandleRequest(ctx echo.Context, term, dept, course string) error {
 
-	ctx := r.Context()
+	rCtx := ctx.Request().Context()
 	client := http.DefaultClient
-	log.WithContext(ctx).Infof("Context loaded. Starting execution.")
-
-	queryString := r.URL.Query()
-	course := queryString["course"]
-	dept := queryString["dept"]
-	term := queryString["term"]
 
 	if len(course) == 0 || len(dept) == 0 || len(term) == 0 {
-		log.WithContext(ctx).Errorf("Malformed request to API")
-		http.Error(w, "bad syntax. Missing params!", http.StatusBadRequest)
-		return
+		log.WithContext(rCtx).Errorf("Malformed request to API")
+		return errors.New("bad syntax. Missing params")
 	}
-	log.WithContext(ctx).Debugf("term: %v", term)
-	log.WithContext(ctx).Debugf("dept: %v", dept)
-	log.WithContext(ctx).Debugf("course: %v", course)
+	log.WithContext(rCtx).Debugf("term: %s", term)
+	log.WithContext(rCtx).Debugf("dept: %s", dept)
+	log.WithContext(rCtx).Debugf("course: %s", course)
 
-	response, err := serverutils.MakeAtlasSectionRequest(client, term[0], dept[0], course[0])
+	response, err := serverutils.MakeAtlasSectionRequest(client, term, dept, course)
 
 	if err != nil {
-		log.WithContext(ctx).Errorf("Request to myInfo failed with error: %v", err)
+		log.WithContext(rCtx).WithError(err).Error("Request to myInfo failed")
 		errorStr := fmt.Sprintf("Request to myInfo failed with error: %v", err)
-		http.Error(w, errorStr, http.StatusInternalServerError)
-		return
+		return errors.New(errorStr)
 	}
 
 	start := time.Now()
-
-	sections, err := serverutils.ParseSectionResponse(response, term[0], "")
-
+	sections, err := serverutils.ParseSectionResponse(response, term, "")
 	elapsed := time.Since(start)
-	log.WithContext(ctx).Infof("Scrape time: %v", elapsed.String())
+	log.WithContext(rCtx).WithField("time", elapsed.String()).Info("Scrape Complete")
 
 	if err != nil {
-		log.WithError(err).WithContext(ctx).Errorf("Course Scrape Failed")
-		errorStr := fmt.Sprintf("Course Scrape Failed with error: %v", err)
-		http.Error(w, errorStr, http.StatusInternalServerError)
-		return
+		log.WithError(err).WithContext(rCtx).Errorf("Course Scrape Failed")
+		return err
 	}
 
 	//Set response headers
-	w.Header().Add("Access-Control-Allow-Origin", "*")
-	w.Header().Add("Access-Control-Allow-Methods", "GET")
-	w.Header().Add("Content-Type", "application/json")
+	//FIXME: Bruh don't be a jerk
+	ctx.Response().Writer.Header().Add("Access-Control-Allow-Origin", "*")
+	ctx.Response().Writer.Header().Add("Access-Control-Allow-Methods", "GET")
+	ctx.Response().Writer.Header().Add("Content-Type", "application/json")
 
-	js, err := json.Marshal(sections)
-	if err != nil {
-		return
-	}
-
-	w.Write(js)
-	response.Body.Close()
+	return ctx.JSON(http.StatusOK, sections)
 }
