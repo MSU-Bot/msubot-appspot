@@ -6,7 +6,7 @@ import (
 
 	"cloud.google.com/go/firestore"
 	"github.com/SpencerCornish/msubot-appspot/server/models"
-	"github.com/sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 )
 
 type fbDStore struct {
@@ -58,7 +58,21 @@ func (f fbDStore) GetCoursesForDepartment(ctx context.Context, term, department 
 
 	return courses, nil
 }
+func (f fbDStore) GetTrackedSectionByID(ctx context.Context, ID string) (*models.TrackedSectionRecord, error) {
+	data, err := f.fbClient.Collection("sections_tracked").Doc(ID).Get(ctx)
+	if err != nil {
+		return nil, err
+	}
 
+	trackedSection := &models.TrackedSectionRecord{}
+	err = data.DataTo(trackedSection)
+	trackedSection.ID = data.Ref.ID
+	if err != nil {
+		return nil, err
+	}
+
+	return trackedSection, nil
+}
 func (f fbDStore) GetTrackedSection(ctx context.Context, term, departmentAbbr, courseNumber string) (*models.TrackedSectionRecord, error) {
 	data, err := f.fbClient.
 		Collection("sections_tracked").
@@ -70,7 +84,7 @@ func (f fbDStore) GetTrackedSection(ctx context.Context, term, departmentAbbr, c
 	}
 
 	if len(data) > 1 {
-		logrus.WithContext(ctx).WithFields(logrus.Fields{
+		log.WithContext(ctx).WithFields(log.Fields{
 			"term":           term,
 			"departmentAbbr": departmentAbbr,
 			"courseNumber":   courseNumber,
@@ -87,20 +101,25 @@ func (f fbDStore) GetTrackedSection(ctx context.Context, term, departmentAbbr, c
 	return trackedSection, nil
 }
 
-func (f fbDStore) UpdateSection(ctx context.Context, sectionID string, atlasSection models.Section) error {
+func (f fbDStore) UpdateSection(ctx context.Context, sectionID string, section models.Section) error {
 	_, err := f.fbClient.Collection("sections_tracked").Doc(sectionID).Set(ctx, map[string]interface{}{
-		"courseName":     atlasSection.CourseName,
-		"courseNumber":   atlasSection.CourseNumber,
-		"crn":            atlasSection.Crn,
-		"department":     atlasSection.DeptName,
-		"departmentAbbr": atlasSection.DeptAbbr,
-		"instructor":     atlasSection.Instructor,
-		"openSeats":      atlasSection.AvailableSeats,
-		"sectionNumber":  atlasSection.SectionNumber,
-		"term":           atlasSection.Term,
-		"totalSeats":     atlasSection.TotalSeats,
+		"courseName":     section.CourseName,
+		"courseNumber":   section.CourseNumber,
+		"crn":            section.Crn,
+		"department":     section.DeptName,
+		"departmentAbbr": section.DeptAbbr,
+		"instructor":     section.Instructor,
+		"openSeats":      section.AvailableSeats,
+		"sectionNumber":  section.SectionNumber,
+		"term":           section.Term,
+		"totalSeats":     section.TotalSeats,
 	}, firestore.MergeAll)
 
+	return err
+}
+
+func (f fbDStore) UpdateTrackedSection(ctx context.Context, trackedSection models.TrackedSectionRecord) error {
+	_, err := f.fbClient.Collection("sections_tracked").Doc(trackedSection.ID).Set(ctx, trackedSection, firestore.MergeAll)
 	return err
 }
 
@@ -154,11 +173,15 @@ func (f fbDStore) MoveTrackedSectionsToArchive(ctx context.Context, sectionIDs [
 			Get(ctx)
 
 		if err != nil {
-			logrus.WithContext(ctx).WithError(err).Error("Failed to get tracked section to move to archive")
+			log.WithContext(ctx).WithError(err).Error("Failed to get tracked section to move to archive")
 			continue
 		}
 
 		trackedSections, err := trackedSectionDocsToModels([]*firestore.DocumentSnapshot{section})
+		if err != nil {
+			log.WithContext(ctx).WithError(err).Error("Failed to convert tracked section database entities to models")
+			continue
+		}
 		trackedSectionToMove := trackedSections[0]
 
 		existingArchiveRecords, err := f.fbClient.
@@ -167,6 +190,10 @@ func (f fbDStore) MoveTrackedSectionsToArchive(ctx context.Context, sectionIDs [
 			Where("departmentAbbr", "==", trackedSectionToMove.DepartmentAbbr).
 			Where("term", "==", trackedSectionToMove.Term).
 			Documents(ctx).GetAll()
+		if err != nil {
+			log.WithContext(ctx).WithError(err).Error("Failed to get existing archive documents")
+			continue
+		}
 
 		// existing archive record, just add users to it
 		if len(existingArchiveRecords) > 0 {
@@ -217,7 +244,7 @@ func (f fbDStore) AddNewTrackedSection(ctx context.Context, sectionRecord models
 	}
 	// Check for existing records, don't make a dupe if there already is one!
 	if len(existingData) > 0 {
-		return nil, errors.New("Tracked Section already exists, not adding a duplicate")
+		return nil, errors.New("tracked Section already exists, not adding a duplicate")
 	}
 
 	newDocRef := f.fbClient.Collection("sections_tracked").NewDoc()

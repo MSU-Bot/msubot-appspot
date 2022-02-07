@@ -40,20 +40,20 @@ type ServerInterface interface {
 	// (POST /service/sms/receive)
 	ReceiveSMS(ctx echo.Context) error
 	// Gets user data for the specified user
-	// (GET /users/{userID})
-	GetUserData(ctx echo.Context, userID string) error
+	// (GET /user)
+	GetUserData(ctx echo.Context) error
 	// Updates or sets userdata for the user
-	// (PUT /users/{userID})
-	UpdateUserData(ctx echo.Context, userID string) error
+	// (PUT /user)
+	UpdateUserData(ctx echo.Context) error
 	// Removes the user from the specified section
-	// (DELETE /users/{userID}/section/{sectionID})
-	RemoveTrackedSectionForUser(ctx echo.Context, userID string, sectionID string) error
+	// (DELETE /user/section/{sectionID})
+	RemoveTrackedSectionForUser(ctx echo.Context, sectionID string) error
 	// Gets tracked sections for the specified user
-	// (GET /users/{userID}/sections)
-	GetTrackedSectionsForUser(ctx echo.Context, userID string) error
+	// (GET /user/sections)
+	GetTrackedSectionsForUser(ctx echo.Context) error
 	// Adds tracked sections for the specified user
-	// (PUT /users/{userID}/sections)
-	AddTrackedSectionsForUser(ctx echo.Context, userID string) error
+	// (PUT /user/sections)
+	AddTrackedSectionsForUser(ctx echo.Context) error
 }
 
 // ServerInterfaceWrapper converts echo contexts to parameters.
@@ -170,50 +170,28 @@ func (w *ServerInterfaceWrapper) ReceiveSMS(ctx echo.Context) error {
 // GetUserData converts echo context to params.
 func (w *ServerInterfaceWrapper) GetUserData(ctx echo.Context) error {
 	var err error
-	// ------------- Path parameter "userID" -------------
-	var userID string
-
-	err = runtime.BindStyledParameter("simple", false, "userID", ctx.Param("userID"), &userID)
-	if err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter userID: %s", err))
-	}
 
 	ctx.Set("bearerAuth.Scopes", []string{""})
 
 	// Invoke the callback with all the unmarshalled arguments
-	err = w.Handler.GetUserData(ctx, userID)
+	err = w.Handler.GetUserData(ctx)
 	return err
 }
 
 // UpdateUserData converts echo context to params.
 func (w *ServerInterfaceWrapper) UpdateUserData(ctx echo.Context) error {
 	var err error
-	// ------------- Path parameter "userID" -------------
-	var userID string
-
-	err = runtime.BindStyledParameter("simple", false, "userID", ctx.Param("userID"), &userID)
-	if err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter userID: %s", err))
-	}
 
 	ctx.Set("bearerAuth.Scopes", []string{""})
 
 	// Invoke the callback with all the unmarshalled arguments
-	err = w.Handler.UpdateUserData(ctx, userID)
+	err = w.Handler.UpdateUserData(ctx)
 	return err
 }
 
 // RemoveTrackedSectionForUser converts echo context to params.
 func (w *ServerInterfaceWrapper) RemoveTrackedSectionForUser(ctx echo.Context) error {
 	var err error
-	// ------------- Path parameter "userID" -------------
-	var userID string
-
-	err = runtime.BindStyledParameter("simple", false, "userID", ctx.Param("userID"), &userID)
-	if err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter userID: %s", err))
-	}
-
 	// ------------- Path parameter "sectionID" -------------
 	var sectionID string
 
@@ -225,43 +203,29 @@ func (w *ServerInterfaceWrapper) RemoveTrackedSectionForUser(ctx echo.Context) e
 	ctx.Set("bearerAuth.Scopes", []string{""})
 
 	// Invoke the callback with all the unmarshalled arguments
-	err = w.Handler.RemoveTrackedSectionForUser(ctx, userID, sectionID)
+	err = w.Handler.RemoveTrackedSectionForUser(ctx, sectionID)
 	return err
 }
 
 // GetTrackedSectionsForUser converts echo context to params.
 func (w *ServerInterfaceWrapper) GetTrackedSectionsForUser(ctx echo.Context) error {
 	var err error
-	// ------------- Path parameter "userID" -------------
-	var userID string
-
-	err = runtime.BindStyledParameter("simple", false, "userID", ctx.Param("userID"), &userID)
-	if err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter userID: %s", err))
-	}
 
 	ctx.Set("bearerAuth.Scopes", []string{""})
 
 	// Invoke the callback with all the unmarshalled arguments
-	err = w.Handler.GetTrackedSectionsForUser(ctx, userID)
+	err = w.Handler.GetTrackedSectionsForUser(ctx)
 	return err
 }
 
 // AddTrackedSectionsForUser converts echo context to params.
 func (w *ServerInterfaceWrapper) AddTrackedSectionsForUser(ctx echo.Context) error {
 	var err error
-	// ------------- Path parameter "userID" -------------
-	var userID string
-
-	err = runtime.BindStyledParameter("simple", false, "userID", ctx.Param("userID"), &userID)
-	if err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter userID: %s", err))
-	}
 
 	ctx.Set("bearerAuth.Scopes", []string{""})
 
 	// Invoke the callback with all the unmarshalled arguments
-	err = w.Handler.AddTrackedSectionsForUser(ctx, userID)
+	err = w.Handler.AddTrackedSectionsForUser(ctx)
 	return err
 }
 
@@ -300,65 +264,64 @@ func RegisterHandlersWithBaseURL(router EchoRouter, si ServerInterface, baseURL 
 	router.GET(baseURL+"/meta", wrapper.GetMeta)
 	router.GET(baseURL+"/sections", wrapper.GetSections)
 	router.POST(baseURL+"/service/sms/receive", wrapper.ReceiveSMS)
-	router.GET(baseURL+"/users/:userID", wrapper.GetUserData)
-	router.PUT(baseURL+"/users/:userID", wrapper.UpdateUserData)
-	router.DELETE(baseURL+"/users/:userID/section/:sectionID", wrapper.RemoveTrackedSectionForUser)
-	router.GET(baseURL+"/users/:userID/sections", wrapper.GetTrackedSectionsForUser)
-	router.PUT(baseURL+"/users/:userID/sections", wrapper.AddTrackedSectionsForUser)
+	router.GET(baseURL+"/user", wrapper.GetUserData)
+	router.PUT(baseURL+"/user", wrapper.UpdateUserData)
+	router.DELETE(baseURL+"/user/section/:sectionID", wrapper.RemoveTrackedSectionForUser)
+	router.GET(baseURL+"/user/sections", wrapper.GetTrackedSectionsForUser)
+	router.PUT(baseURL+"/user/sections", wrapper.AddTrackedSectionsForUser)
 
 }
 
 // Base64 encoded, gzipped, json marshaled Swagger object
 var swaggerSpec = []string{
 
-	"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",
-	"ZvOvAAAA///6+X4Z7TMAAA==",
+	"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",
 }
 
 // GetSwagger returns the Swagger specification corresponding to the generated code

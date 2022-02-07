@@ -17,7 +17,6 @@ import (
 
 // HandleRequest runs often to check for open seats
 func HandleRequest(ctx echo.Context, ds dstore.DStore) error {
-	writer := ctx.Response().Writer
 	client := http.DefaultClient
 
 	rCtx := ctx.Request().Context()
@@ -27,7 +26,6 @@ func HandleRequest(ctx echo.Context, ds dstore.DStore) error {
 	trackedSections, err := ds.GetAllTrackedSections(rCtx)
 	if err != nil {
 		log.WithContext(rCtx).WithError(err).Error("Could not get all tracked sections")
-		writer.WriteHeader(500)
 		return errors.New("could not get all tracked sections")
 	}
 
@@ -57,7 +55,6 @@ func HandleRequest(ctx echo.Context, ds dstore.DStore) error {
 		<-requestCompleteChannel
 	}
 
-	writer.WriteHeader(200)
 	return nil
 }
 
