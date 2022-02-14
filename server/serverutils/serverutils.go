@@ -199,7 +199,63 @@ func GetFirebaseClient(ctx context.Context) *firestore.Client {
 
 	if value := os.Getenv("FIRESTORE_EMULATOR_HOST"); value != "" {
 		log.Warningf("Using Firestore Emulator: %s", value)
+		// err := addTestingData(fbClient)
+		// log.WithError(err).Info("added data")
 	}
 
 	return fbClient
 }
+
+// func addTestingData(fbClient *firestore.Client) error {
+// 	wb := fbClient.Batch()
+
+// 	// Globals
+// 	wb.Create(fbClient.Collection("global").Doc("global"), map[string]interface{}{
+// 		"coursesTracked": 999,
+// 		"motd":           "",
+// 		"textsSent":      -1,
+// 		"users":          999,
+// 	})
+
+// 	// Depts
+// 	wb.Create(fbClient.Collection("departments").Doc("CSCI"), map[string]interface{}{
+// 		"name":        "Computerz",
+// 		"updatedTime": time.Now(),
+// 	})
+
+// 	//Dept Classes
+// 	wb.Create(fbClient.Collection("departments").Doc("CSCI").Collection("202270").Doc("999D"), map[string]interface{}{
+// 		"title": "SPENCER",
+// 	})
+
+// 	//Users
+// 	wb.Create(fbClient.Collection("users").NewDoc(), map[string]interface{}{
+// 		"number":      "+14069999999",
+// 		"welcomeSent": true,
+// 	})
+
+// 	//Tracked Sections
+// 	wb.Create(fbClient.Collection("sections_tracked").NewDoc(), map[string]interface{}{
+// 		"courseName":     "Multidisc Engineering Design",
+// 		"courseNumber":   "310R",
+// 		"creationTime":   time.Now(),
+// 		"crn":            "33761",
+// 		"department":     "Engineering",
+// 		"departmentAbbr": "EGEN",
+// 		"instructor":     "Rutherford, Spencer",
+// 		"openSeats":      "0",
+// 		"sectionNumber":  37,
+// 		"term":           "202230",
+// 		"totalSeats":     "10",
+// 		"users": []string{
+// 			"NTWUmukBvpRuEEXlRyUzKE5R73W2",
+
+// 			"LerHamgx4gPUoqzaH4w26zVsEvu1",
+
+// 			"7VE4YazkwlXpoQlSXHUF9RHmTB33",
+
+// 			"6dBimgScTuYnn6vmCrDDEwyN5Xy1"},
+// 	})
+// 	_, err := wb.Commit(context.Background())
+// 	return err
+// }

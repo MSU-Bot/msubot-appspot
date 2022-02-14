@@ -148,7 +148,7 @@ func (s serverInterface) GetUserData(ctx echo.Context) error {
 }
 
 func (s serverInterface) UpdateUserData(ctx echo.Context) error {
-	token, err := mauth.VerifyToken(ctx)
+	_, err := mauth.VerifyToken(ctx)
 	if err != nil {
 		return sendError(ctx, http.StatusForbidden, "Invalid authentication")
 	}
@@ -170,7 +170,7 @@ func (s serverInterface) RemoveTrackedSectionForUser(ctx echo.Context, sectionID
 }
 
 func (s serverInterface) GetTrackedSectionsForUser(ctx echo.Context) error {
-	token, err := mauth.VerifyToken(ctx)
+	_, err := mauth.VerifyToken(ctx)
 	if err != nil {
 		return sendError(ctx, http.StatusForbidden, "Invalid authentication")
 	}
@@ -179,7 +179,7 @@ func (s serverInterface) GetTrackedSectionsForUser(ctx echo.Context) error {
 }
 
 func (s serverInterface) AddTrackedSectionsForUser(ctx echo.Context) error {
-	token, err := mauth.VerifyToken(ctx)
+	_, err := mauth.VerifyToken(ctx)
 	if err != nil {
 		return sendError(ctx, http.StatusForbidden, "Invalid authentication")
 	}
