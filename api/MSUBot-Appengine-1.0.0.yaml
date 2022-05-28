@@ -80,7 +80,7 @@ paths:
                 $ref: '#/components/schemas/Error'
                   
   
-  /department/courses:
+  /departments/{departmentID}/courses:
     get:
       tags:
         - everyone
@@ -96,8 +96,8 @@ paths:
           required: true
           schema:
             type: string
-        - in: query
-          name: deptAbbr
+        - in: path
+          name: departmentID
           description: Short name for department
           example: "COMX"
           required: true
@@ -121,7 +121,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
-  /sections:
+  /departments/{departmentID}/courses/{courseID}:
     get:
       tags:
         - everyone
@@ -132,20 +132,20 @@ paths:
       parameters:
         - in: query
           name: term
-          description: Semester code in the format `{Year}{30|50|70}`
+          description: Semester code (usually) in the format `{Year}{30|50|70}`
           example: "202030"
           required: true
           schema:
             type: string
-        - in: query
-          name: deptAbbr
+        - in: path
+          name: departmentID
           description: Short name for department
           example: "COMX"
           required: true
           schema:
             type: string
-        - in: query
-          name: course
+        - in: path
+          name: courseID
           description: Course "Number" (Also includes Core Tags, like RN)
           example: "101IR"
           required: true
@@ -171,7 +171,7 @@ paths:
   # User accessible paths
   # # # # # # # # # # # # #
   
-  /user:
+  /user/{userID}:
     get:
       tags:
         - users
@@ -181,6 +181,13 @@ paths:
         Gets the user's metadata from the service
       security:
         - bearerAuth: []
+      parameters:
+        - in: path
+          name: userID
+          description: The user's ID. Should also be present as part of the auth token
+          required: true
+          schema:
+            type: string
       responses:
         '200':
           description: "Successfully found userdata"
@@ -205,6 +212,13 @@ paths:
         Updates the user's metadata from the service
       security:
         - bearerAuth: []
+      parameters:
+        - in: path
+          name: userID
+          description: The user's ID. Should also be present as part of the auth token
+          required: true
+          schema:
+            type: string
       requestBody:
         content:
           application/json:
@@ -231,7 +245,7 @@ paths:
   
   
   
-  /user/sections:
+  /user/{userID}/sections:
     get:
       tags:
         - users
@@ -241,6 +255,13 @@ paths:
         Gets the tracked sections for the specified user. User must be authenticated
       security:
         - bearerAuth: []
+      parameters:
+        - in: path
+          name: userID
+          description: The user's ID. Should also be present as part of the auth token
+          required: true
+          schema:
+            type: string
       responses:
         '200':
           description: "Successfully found tracked sections for the user"
@@ -265,6 +286,13 @@ paths:
         Adds the provided trackedSections for the specified, authed user
       security:
         - bearerAuth: []
+      parameters:
+        - in: path
+          name: userID
+          description: The user's ID. Should also be present as part of the auth token
+          required: true
+          schema:
+            type: string
       requestBody:
         content:
           application/json:
@@ -286,7 +314,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
-  /user/section/{sectionID}:
+  /users/{userID}/sections/{sectionID}:
     delete:
       tags:
         - users
@@ -298,12 +326,18 @@ paths:
         - bearerAuth: []
       parameters:          
         - in: path
+          name: userID
+          description: The unique identifier of the user
+          required: true
+          schema:
+            type: string  
+        - in: path
           name: sectionID
           description: The unique identifier of the section
           example: "--YFcwy7rZNP2Gclz5xx79"
           required: true
           schema:
-            type: string   
+            type: string    
       responses:
         '200':
           description: "User removed from tracked section"
@@ -315,8 +349,6 @@ paths:
                 $ref: '#/components/schemas/Error'
 
 
-  
-  
   
   # # # # # # # # # # # # # # # 
   # Cron accessible paths
@@ -341,6 +373,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+
   /cron/prunetrackedsections:
     get:
       tags:

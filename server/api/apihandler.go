@@ -38,20 +38,24 @@ func sendError(ctx echo.Context, code int, message string) error {
 }
 
 // Service API
+/// [CheckTrackedSections] is run by the Appengine Cron and checks tracked CRNs
+/// for open seats
 func (s serverInterface) CheckTrackedSections(ctx echo.Context) error {
 	if err := mauth.VerifyAppengineCron(ctx); err != nil {
-		return sendError(ctx, http.StatusForbidden, "Insufficient qualifications")
+		return sendError(ctx, http.StatusForbidden, "Unauthorized")
 	}
 	err := checksections.HandleRequest(ctx, s.datastore)
 	if err != nil {
-		return sendError(ctx, http.StatusInternalServerError, "Server failed to handle request")
+		return sendError(ctx, http.StatusInternalServerError, "Server failed to check tracked sections")
 	}
 	return ctx.NoContent(http.StatusOK)
 }
 
+/// [PruneTrackedSections] is run by the Appengine Cron infrequently to
+/// clean up sections that are irrelevant due to time
 func (s serverInterface) PruneTrackedSections(ctx echo.Context) error {
 	if err := mauth.VerifyAppengineCron(ctx); err != nil {
-		return sendError(ctx, http.StatusForbidden, "Insufficient qualifications")
+		return sendError(ctx, http.StatusForbidden, "Unauthorized")
 	}
 	err := pruner.HandleRequest(ctx, s.datastore)
 	if err != nil {
@@ -61,7 +65,9 @@ func (s serverInterface) PruneTrackedSections(ctx echo.Context) error {
 	return ctx.NoContent(http.StatusOK)
 }
 
+/// [ReceiveSMS] handles incoming SMS from Plivo, and responds with appropriate data
 func (s serverInterface) ReceiveSMS(ctx echo.Context) error {
+	// TODO: Validate this is coming from plivo
 	if err := ctx.Request().ParseForm(); err != nil {
 		return sendError(ctx, http.StatusBadRequest, "Formdata could not be parsed")
 	}
@@ -79,9 +85,10 @@ func (s serverInterface) ReceiveSMS(ctx echo.Context) error {
 }
 
 // Public API
-func (s serverInterface) GetCoursesForDepartment(ctx echo.Context, params GetCoursesForDepartmentParams) error {
+/// [GetCoursesForDepartment] Gets simple course metadata for a specified department
+func (s serverInterface) GetCoursesForDepartment(ctx echo.Context, departmentID string, params GetCoursesForDepartmentParams) error {
 	// TODO: Validate term and dept
-	courseRecords, err := s.datastore.GetCoursesForDepartment(ctx.Request().Context(), params.Term, params.DeptAbbr)
+	courseRecords, err := s.datastore.GetCoursesForDepartment(ctx.Request().Context(), params.Term, departmentID)
 	if err != nil {
 		return sendError(ctx, http.StatusInternalServerError, "Failed to get courses")
 	}
@@ -97,6 +104,8 @@ func (s serverInterface) GetCoursesForDepartment(ctx echo.Context, params GetCou
 	return ctx.JSON(http.StatusOK, courses)
 }
 
+/// [GetDepartments] Gets the list of departments currently provided by ATLAS
+/// There is no guarantee that these have classes associated with them
 func (s serverInterface) GetDepartments(ctx echo.Context) error {
 	departments, err := s.datastore.GetDepartments(ctx.Request().Context())
 	if err != nil {
@@ -105,6 +114,7 @@ func (s serverInterface) GetDepartments(ctx echo.Context) error {
 	return ctx.JSON(http.StatusOK, departments)
 }
 
+/// [GetMeta] Returns any relevant global info for the client
 func (s serverInterface) GetMeta(ctx echo.Context) error {
 	meta, err := s.datastore.GetMeta(ctx.Request().Context())
 	if err != nil {
@@ -113,8 +123,9 @@ func (s serverInterface) GetMeta(ctx echo.Context) error {
 	return ctx.JSON(http.StatusOK, *meta)
 }
 
-func (s serverInterface) GetSections(ctx echo.Context, params GetSectionsParams) error {
-	scrapedSections, err := scraper.HandleRequest(ctx.Request().Context(), params.Term, params.DeptAbbr, params.Course)
+/// [GetSections] Scrapes ATLAS for up-to-date CRN metadata
+func (s serverInterface) GetSections(ctx echo.Context, departmentID, courseID string, params GetSectionsParams) error {
+	scrapedSections, err := scraper.HandleRequest(ctx.Request().Context(), params.Term, departmentID, courseID)
 	if err != nil {
 		return sendError(ctx, http.StatusInternalServerError, "Failed to get sections")
 	}
@@ -127,7 +138,8 @@ func (s serverInterface) GetSections(ctx echo.Context, params GetSectionsParams)
 }
 
 // Authenticated API
-func (s serverInterface) GetUserData(ctx echo.Context) error {
+/// [GetUserData] Returns userdata for the currently auth'ed user
+func (s serverInterface) GetUserData(ctx echo.Context, userID string) error {
 	token, err := mauth.VerifyToken(ctx)
 	if err != nil {
 		return sendError(ctx, http.StatusForbidden, "Invalid authentication")
@@ -147,16 +159,26 @@ func (s serverInterface) GetUserData(ctx echo.Context) error {
 	return ctx.JSON(http.StatusOK, respUser)
 }
 
-func (s serverInterface) UpdateUserData(ctx echo.Context) error {
-	_, err := mauth.VerifyToken(ctx)
+/// [UpdateUserData] takes an array of userdatas and updates the currently auth'ed user
+/// TODO: This takes multiple users for some reason, we probably just need to take one?
+func (s serverInterface) UpdateUserData(ctx echo.Context, userID string) error {
+	token, err := mauth.VerifyToken(ctx)
 	if err != nil {
 		return sendError(ctx, http.StatusForbidden, "Invalid authentication")
 	}
 
+	_, err = s.datastore.GetUser(ctx.Request().Context(), token.UID)
+	if err != nil {
+		return sendError(ctx, http.StatusBadRequest, "Failed to find user data")
+	}
+
+	// ctx.Request().Body
+
 	panic("implement me")
 }
 
-func (s serverInterface) RemoveTrackedSectionForUser(ctx echo.Context, sectionID string) error {
+/// [RemoveTrackedSectionForUser] takes a tracked `sectionID` and untracks it for the current user
+func (s serverInterface) RemoveTrackedSectionForUser(ctx echo.Context, userID, sectionID string) error {
 	token, err := mauth.VerifyToken(ctx)
 	if err != nil {
 		return sendError(ctx, http.StatusForbidden, "Invalid authentication")
@@ -169,7 +191,8 @@ func (s serverInterface) RemoveTrackedSectionForUser(ctx echo.Context, sectionID
 	return ctx.NoContent(http.StatusOK)
 }
 
-func (s serverInterface) GetTrackedSectionsForUser(ctx echo.Context) error {
+/// [GetTrackedSectionsForUser] Fetches the auth'ed user's currently tracked sections
+func (s serverInterface) GetTrackedSectionsForUser(ctx echo.Context, userID string) error {
 	_, err := mauth.VerifyToken(ctx)
 	if err != nil {
 		return sendError(ctx, http.StatusForbidden, "Invalid authentication")
@@ -178,7 +201,8 @@ func (s serverInterface) GetTrackedSectionsForUser(ctx echo.Context) error {
 	panic("implement me")
 }
 
-func (s serverInterface) AddTrackedSectionsForUser(ctx echo.Context) error {
+/// [AddTrackedSectionsForUser] Adds new tracked sections for the auth'ed user
+func (s serverInterface) AddTrackedSectionsForUser(ctx echo.Context, userID string) error {
 	_, err := mauth.VerifyToken(ctx)
 	if err != nil {
 		return sendError(ctx, http.StatusForbidden, "Invalid authentication")

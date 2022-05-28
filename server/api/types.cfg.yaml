@@ -1,5 +1,5 @@
+package: api
 output:
   msubot-types.gen.go
 generate:
-  - types
-package: api
+  models: true
