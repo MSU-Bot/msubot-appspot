@@ -1,0 +1,6 @@
+package: api
+output:
+  msubot-server.gen.go
+generate:
+  echo-server: true
+  embedded-spec: true

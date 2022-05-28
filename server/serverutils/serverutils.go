@@ -27,10 +27,10 @@ func MakeAtlasSectionRequest(client *http.Client, term, dept, course string) (*h
 	body := buildAtlasRequestBody(term, dept, course)
 
 	req, err := http.NewRequest("POST", sectionRequestURL, body)
-	defer req.Body.Close()
 	if err != nil {
 		return nil, err
 	}
+	defer req.Body.Close()
 
 	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 	resp, err := client.Do(req)
@@ -50,7 +50,7 @@ func buildAtlasRequestBody(term, department, course string) io.Reader {
 }
 
 // ParseSectionResponse turns the http.Response into a slice of sections
-func ParseSectionResponse(response *http.Response, crnToFind string) ([]models.Section, error) {
+func ParseSectionResponse(response *http.Response, termString, crnToFind string) ([]models.Section, error) {
 	sections := []models.Section{}
 	doc, err := goquery.NewDocumentFromReader(response.Body)
 	if err != nil {
@@ -70,6 +70,7 @@ func ParseSectionResponse(response *http.Response, crnToFind string) ([]models.S
 			}
 
 			newSection := models.Section{
+				Term:           termString,
 				DeptAbbr:       matches[0],
 				CourseNumber:   matches[1],
 				SectionNumber:  matches[2],
@@ -128,6 +129,7 @@ func SendText(client *http.Client, number, message string) (response *http.Respo
 	if authID == "" || authToken == "" {
 		panic("nil env")
 	}
+
 	// TODO: Create sms callback handler
 	url := getPlivoURL(authID)
 	data := plivoRequest{Src: sourceNumber, Dst: number, Text: message}
@@ -186,94 +188,74 @@ func GetFirebaseClient(ctx context.Context) *firestore.Client {
 	firebasePID := os.Getenv("FIREBASE_PROJECT")
 	log.WithContext(ctx).Infof("Loaded firebase project ID.")
 	if firebasePID == "" {
-		log.WithContext(ctx).Errorf("Firebase Project ID is nil, I cannot continue.")
-		panic("Firebase Project ID is nil")
+		log.WithContext(ctx).Fatal("Firebase Project ID is nil, I cannot continue.")
 	}
 
 	fbClient, err := firestore.NewClient(ctx, firebasePID)
 	if err != nil {
-		log.WithContext(ctx).WithError(err).Errorf("Could not create new client for Firebase")
-		return nil
+		log.WithContext(ctx).WithError(err).Fatal("Could not create new client for Firebase")
 	}
 	log.WithContext(ctx).Infof("successfully opened firestore client")
+
+	if value := os.Getenv("FIRESTORE_EMULATOR_HOST"); value != "" {
+		log.Warningf("Using Firestore Emulator: %s", value)
+		// err := addTestingData(fbClient)
+		// log.WithError(err).Info("added data")
+	}
 
 	return fbClient
 }
 
-// MoveTrackedSection moves old sections out of the prod area
-func MoveTrackedSection(ctx context.Context, fbClient *firestore.Client, crn, uid, term string) error {
+// func addTestingData(fbClient *firestore.Client) error {
+// 	wb := fbClient.Batch()
 
-	// Look for an existing archive doc to add userdata to
-	docArchiveIter := fbClient.Collection("sections_archive").Where("term", "==", term).Where("crn", "==", crn).Documents(ctx)
-	archiveDocs, err := docArchiveIter.GetAll()
+// 	// Globals
+// 	wb.Create(fbClient.Collection("global").Doc("global"), map[string]interface{}{
+// 		"coursesTracked": 999,
+// 		"motd":           "",
+// 		"textsSent":      -1,
+// 		"users":          999,
+// 	})
 
-	if err != nil {
-		log.WithContext(ctx).WithError(err).Errorf("Could not get list of archive docs for uid %v: %v", uid, err)
-		return err
-	}
+// 	// Depts
+// 	wb.Create(fbClient.Collection("departments").Doc("CSCI"), map[string]interface{}{
+// 		"name":        "Computerz",
+// 		"updatedTime": time.Now(),
+// 	})
 
-	// Get the document that we need to move
-	docToMove, err := fbClient.Collection("sections_tracked").Doc(uid).Get(ctx)
-	docToMoveData := docToMove.Data()
+// 	//Dept Classes
+// 	wb.Create(fbClient.Collection("departments").Doc("CSCI").Collection("202270").Doc("999D"), map[string]interface{}{
+// 		"title": "SPENCER",
+// 	})
 
-	if err != nil {
-		log.WithContext(ctx).WithError(err).Errorf("Could not get the new doc for uid %s : %v", uid, err)
-		return err
-	}
+// 	//Users
+// 	wb.Create(fbClient.Collection("users").NewDoc(), map[string]interface{}{
+// 		"number":      "+14069999999",
+// 		"welcomeSent": true,
+// 	})
 
-	//  if there is a doc, merge with it rather than making a new one
-	if archiveDocs != nil {
-		if len(archiveDocs) > 1 {
-			log.WithContext(ctx).WithError(err).Errorf("Duplicate archiveDocs: %v", archiveDocs)
-		}
+// 	//Tracked Sections
+// 	wb.Create(fbClient.Collection("sections_tracked").NewDoc(), map[string]interface{}{
+// 		"courseName":     "Multidisc Engineering Design",
+// 		"courseNumber":   "310R",
+// 		"creationTime":   time.Now(),
+// 		"crn":            "33761",
+// 		"department":     "Engineering",
+// 		"departmentAbbr": "EGEN",
+// 		"instructor":     "Rutherford, Spencer",
+// 		"openSeats":      "0",
+// 		"sectionNumber":  37,
+// 		"term":           "202230",
+// 		"totalSeats":     "10",
+// 		"users": []string{
+// 			"NTWUmukBvpRuEEXlRyUzKE5R73W2",
 
-		//  Get the data for the archive docs
-		data := archiveDocs[0].Data()
+// 			"LerHamgx4gPUoqzaH4w26zVsEvu1",
 
-		// get all the users
-		users, ok := data["users"].([]interface{})
-		if !ok {
-			log.WithContext(ctx).WithError(err).Errorf("couldn't parse userslice")
-			return nil
-		}
+// 			"7VE4YazkwlXpoQlSXHUF9RHmTB33",
 
-		// get all the users
-		usersToAdd, ok := docToMoveData["users"].([]interface{})
-		if !ok {
-			log.WithContext(ctx).WithError(err).Errorf("couldn't parse userslice")
-			return nil
-		}
-
-		//  make a mega list
-		allUsers := append(users, usersToAdd...)
-
-		// Update that userlist
-		_, err := archiveDocs[0].Ref.Set(ctx, map[string]interface{}{
-			"users": allUsers,
-		}, firestore.MergeAll)
-		if err != nil {
-			log.WithContext(ctx).WithError(err).Errorf("Error appending users to archive")
-			return err
-		}
-
-	} else {
-
-		// Add a new doc
-		_, _, err := fbClient.Collection("sections_archive").Add(ctx, docToMoveData)
-		if err != nil {
-			log.WithContext(ctx).WithError(err).Errorf("Error creating a new archived doc")
-			return err
-		}
-
-	}
-
-	//  Finally delete the old one
-	_, err = docToMove.Ref.Delete(ctx)
-	if err != nil {
-		log.WithContext(ctx).WithError(err).Errorf("Error deleting old document")
-		return err
-	}
-
-	return nil
-
-}
+// 			"6dBimgScTuYnn6vmCrDDEwyN5Xy1"},
+// 	})
+// 	_, err := wb.Commit(context.Background())
+// 	return err
+// }

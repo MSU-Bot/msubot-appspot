@@ -9,3 +9,7 @@ deploy-staging-cron:
 
 deploy-prod:
 	gcloud app deploy cron.yaml app-prod.yaml --project msu-bot
+
+
+generate:
+	go generate ./...

@@ -8,6 +8,7 @@
 app-prod.yaml
 app-staging.yaml
 app.yaml
+app-staging.yaml
 
 # Test binary, build with `go test -c`
 *.test
@@ -19,3 +20,7 @@ msubot-appspot
 
 .vscode/
 
+app-local.env
+
+
+test/mock_data
