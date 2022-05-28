@@ -6,7 +6,7 @@ jobs:
   build:
     docker:
       # specify the version
-      - image: circleci/golang:1.13
+      - image: circleci/golang:1.16
 
     working_directory: /go/src/github.com/MSU-Bot/msubot-appspot
     steps:
@@ -16,7 +16,7 @@ jobs:
           name: Get Dependencies
           command: |
             go get -t -d ./...
-            go install github.com/mattn/goveralls
+            go install github.com/mattn/goveralls@latest
       - run:
           name: Run Tests and Report Coverage
           command: |
