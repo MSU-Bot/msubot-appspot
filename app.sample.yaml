@@ -1,4 +1,6 @@
-runtime: go115
+runtime: go118
+instance_class: F1
+
 env_variables:
   FIREBASE_PROJECT: "Project_here"
   PLIVO_AUTH_ID: "p_k"
