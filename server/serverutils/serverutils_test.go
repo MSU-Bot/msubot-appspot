@@ -3,7 +3,6 @@ package serverutils
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"os"
 	"testing"
@@ -48,7 +47,7 @@ func TestMakeAtlasSectionRequest_Success(t *testing.T) {
 }
 
 func TestBuildAtlasRequestBody_Success(t *testing.T) {
-	expectedOutput := fmt.Sprintf("sel_subj=dummy&bl_online=FALSE&sel_day=dummy&term=909090&sel_subj=YEET&sel_inst=ANY&sel_online=&sel_crse=290IN&begin_hh=0&begin_mi=0&end_hh=0&end_mi=0")
+	expectedOutput := "sel_subj=dummy&bl_online=FALSE&sel_day=dummy&sel_online=dummy&term=909090&sel_subj=YEET&sel_inst=0&sel_online=&sel_crse=290IN&begin_hh=0&begin_mi=0&end_hh=0&end_mi=0"
 	actual := buildAtlasRequestBody(testTerm, testDept, testCourse)
 
 	buf := new(bytes.Buffer)
