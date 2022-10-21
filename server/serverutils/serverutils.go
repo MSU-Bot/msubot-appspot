@@ -27,10 +27,10 @@ func MakeAtlasSectionRequest(client *http.Client, term, dept, course string) (*h
 	body := buildAtlasRequestBody(term, dept, course)
 
 	req, err := http.NewRequest("POST", sectionRequestURL, body)
-	defer req.Body.Close()
 	if err != nil {
 		return nil, err
 	}
+	defer req.Body.Close()
 
 	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 	resp, err := client.Do(req)
@@ -41,7 +41,7 @@ func MakeAtlasSectionRequest(client *http.Client, term, dept, course string) (*h
 }
 
 func buildAtlasRequestBody(term, department, course string) io.Reader {
-	body := fmt.Sprintf("sel_subj=dummy&bl_online=FALSE&sel_day=dummy&term=%v&sel_subj=%v&sel_inst=ANY&sel_online=&sel_crse=%v&begin_hh=0&begin_mi=0&end_hh=0&end_mi=0",
+	body := fmt.Sprintf("sel_subj=dummy&bl_online=FALSE&sel_day=dummy&sel_online=dummy&term=%v&sel_subj=%v&sel_inst=0&sel_online=&sel_crse=%v&begin_hh=0&begin_mi=0&end_hh=0&end_mi=0",
 		term,
 		department,
 		course)
