@@ -260,14 +260,13 @@ func removeSectionFromUserData(ctx context.Context, fbClient *firestore.Client, 
 }
 
 func sendOpenSeatMessages(ctx context.Context, client *http.Client, fbClient *firestore.Client, users []interface{}, section models.Section) error {
-	for _, user := range users {
-		userData, err := serverutils.GetUserdata(ctx, user.(string))
+	userData, err := serverutils.GetUserdata(ctx, users)
 
-		err = serverutils.SendEmail(userData.DisplayName, userData.Email, section)
-		if err != nil {
-			log.WithContext(ctx).Errorf("error sending email: %v", err)
-			return err
-		}
+	err = serverutils.SendEmail(userData, section)
+	if err != nil {
+		log.WithContext(ctx).Errorf("error sending email: %v", err)
+		return err
 	}
+
 	return nil
 }

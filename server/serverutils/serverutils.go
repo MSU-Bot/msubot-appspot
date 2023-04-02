@@ -40,7 +40,6 @@ func GetFirebaseClient(ctx context.Context) *firestore.Client {
 	}
 
 	fbClient, err := fbApp.Firestore(ctx)
-	defer fbClient.Close()
 	if err != nil {
 		log.WithContext(ctx).WithError(err).Errorf("Could not create new client for Firebase")
 		return nil
@@ -170,31 +169,38 @@ func ParseSectionResponse(response *http.Response, crnToFind string) ([]models.S
 // Notification Functions
 ////////////////////////////
 
-func SendEmail(name, emailAddress string, section models.Section) error {
+func SendEmail(userdata []*auth.UserRecord, section models.Section) error {
+	m := mail.NewV3Mail()
 	from := mail.NewEmail("MSUBot", "noreply@unwent.com")
-	to := mail.NewEmail(name, emailAddress)
+	m.SetFrom(from)
+	m.SetTemplateID("d-2be4c913792e48a7ac9860f4216967e3")
 
-	subject := fmt.Sprintf("%s-%s has %s seats open", section.DeptAbbr, section.CourseNumber, section.AvailableSeats)
-	now := time.Now()
-	plainTextContent := fmt.Sprintf(
-		`Your tracked course on MSUBot now has seats available.
-		 %s-%s: %s
-		 CRN: %s
-		 	
-		 Results as of %d.
-		`, section.DeptAbbr, section.CourseNumber, section.CourseName, section.Crn, now)
-	htmlContent := fmt.Sprintf("<strong>%s</strong>", plainTextContent)
-	message := mail.NewSingleEmail(from, subject, to, plainTextContent, htmlContent)
-	client := sendgrid.NewSendClient(os.Getenv("SENDGRID_API_KEY"))
+	p := mail.NewPersonalization()
+	tos := make([]*mail.Email, len(userdata))
+	for i, user := range userdata {
+		tos[i] = mail.NewEmail(user.DisplayName, user.Email)
+	}
+	p.AddBCCs(tos...)
 
-	response, err := client.Send(message)
+	p.SetDynamicTemplateData("open_seats", section.AvailableSeats)
+	p.SetDynamicTemplateData("course_info", fmt.Sprintf("%s-%s: %s CRN: %s", section.DeptAbbr, section.CourseNumber, section.CourseName, section.Crn))
+	p.SetDynamicTemplateData("time", time.Now().Format(time.UnixDate))
+
+	m.AddPersonalizations(p)
+
+	request := sendgrid.GetRequest(os.Getenv("SENDGRID_API_KEY"), "/v3/mail/send", "https://api.sendgrid.com")
+	request.Method = "POST"
+	var Body = mail.GetRequestBody(m)
+	request.Body = Body
+	response, err := sendgrid.API(request)
 	if err != nil {
 		return err
 	} else {
-		log.Info(response.StatusCode)
-		log.Info(response.Body)
-		log.Info(response.Headers)
+		fmt.Println(response.StatusCode)
+		fmt.Println(response.Body)
+		fmt.Println(response.Headers)
 	}
+
 	return nil
 }
 
@@ -248,7 +254,7 @@ func FetchUserDataWithNumber(ctx context.Context, number string) (map[string]int
 	return nil, ""
 }
 
-func GetUserdata(ctx context.Context, useruid string) (*auth.UserRecord, error) {
+func GetUserdata(ctx context.Context, useruids []interface{}) ([]*auth.UserRecord, error) {
 	fbApp, err := GetFirebaseApp(ctx)
 	if err != nil {
 		log.WithContext(ctx).WithError(err).Errorf("Could not create new appclient for Firebase")
@@ -260,11 +266,16 @@ func GetUserdata(ctx context.Context, useruid string) (*auth.UserRecord, error) 
 		return nil, err
 	}
 
-	result, err := authClient.GetUser(ctx, useruid)
+	firebaseUsers := make([]auth.UserIdentifier, len(useruids))
+	for i, uid := range useruids {
+		firebaseUsers[i] = auth.UIDIdentifier{UID: uid.(string)}
+	}
+
+	result, err := authClient.GetUsers(ctx, firebaseUsers)
 	if err != nil {
 		return nil, err
 	}
-	return result, nil
+	return result.Users, nil
 }
 
 // LookupUserNumber looks up a user's phone number from their uid
