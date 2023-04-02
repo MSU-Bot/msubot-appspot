@@ -18,9 +18,15 @@ import (
 )
 
 const (
-	sectionRequestURL = "https://prodmyinfo.montana.edu/pls/bzagent/bzskcrse.PW_ListSchClassSimple"
-	sourceNumber      = "14068000110"
+	sectionRequestURL    = "https://prodmyinfo.montana.edu/pls/bzagent/bzskcrse.PW_ListSchClassSimple"
+	departmentRequestURL = "https://prodmyinfo.montana.edu/pls/bzagent/bzskcrse.PW_SelSchClass"
+	sourceNumber         = "14068000110"
 )
+
+func MakeAtlasDepartmentRequest(client *http.Client) (*http.Response, error) {
+	resp, err := http.Get(departmentRequestURL)
+	return resp, err
+}
 
 // MakeAtlasSectionRequest makes a request to Atlas for section data in the term, department, and course
 func MakeAtlasSectionRequest(client *http.Client, term, dept, course string) (*http.Response, error) {
@@ -47,6 +53,33 @@ func buildAtlasRequestBody(term, department, course string) io.Reader {
 		course)
 
 	return strings.NewReader(body)
+}
+
+func ParseDepartmentResponse(response *http.Response) ([]*models.Department, error) {
+	departments := []*models.Department{}
+
+	doc, err := goquery.NewDocumentFromReader(response.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	rawDepts := doc.Find("#selsubj").Children()
+	rawDepts.Each(func(i int, s *goquery.Selection) {
+		abbr, name, found := strings.Cut(s.Text(), "-")
+		if !found {
+			log.WithField("dept text", s.Text()).Warn("Failed to split department in string")
+			return
+		}
+
+		departments = append(departments, &models.Department{
+			Id:   strings.TrimSpace(abbr),
+			Name: strings.TrimSpace(name),
+		})
+	})
+
+	log.WithField("Processed Departments", departments[0].Name).Info(`Finished processing department list`)
+	return departments, nil
+
 }
 
 // ParseSectionResponse turns the http.Response into a slice of sections

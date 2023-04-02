@@ -20,3 +20,13 @@ type Section struct {
 	TakenSeats     string
 	AvailableSeats string
 }
+
+type CourseMeta struct {
+	Number string
+	Title  string
+}
+
+type Department struct {
+	Id   string
+	Name string
+}

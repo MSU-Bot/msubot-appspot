@@ -22,10 +22,11 @@ func main() {
 	http.HandleFunc("/prunesections", pruner.HandleRequest)
 	http.HandleFunc("/receivemessage", messenger.RecieveMessage)
 	http.HandleFunc("/healthcheck", healthcheck.CheckHealth)
+	http.HandleFunc("/updatedepartments", scraper.HandleDepartmentRequest)
 
 	port := os.Getenv("PORT")
 	if port == "" {
-		port = "8080"
+		port = "8082"
 		log.Printf("Defaulting to port %s", port)
 	}
 
