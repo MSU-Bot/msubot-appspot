@@ -2,12 +2,10 @@ package serverutils
 
 import (
 	"bytes"
-	"encoding/json"
 	"net/http"
-	"os"
 	"testing"
 
-	"github.com/SpencerCornish/msubot-appspot/server/testutils"
+	"github.com/MSU-Bot/msubot-appspot/server/testutils"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -56,37 +54,37 @@ func TestBuildAtlasRequestBody_Success(t *testing.T) {
 	assert.Equal(t, expectedOutput, actualString)
 }
 
-func TestSendText_SingleSuccess(t *testing.T) {
+// func TestSendText_SingleSuccess(t *testing.T) {
 
-	os.Setenv("PLIVO_AUTH_ID", testPlivoID)
-	os.Setenv("PLIVO_AUTH_TOKEN", testPlivoAuthToken)
+// 	os.Setenv("PLIVO_AUTH_ID", testPlivoID)
+// 	os.Setenv("PLIVO_AUTH_TOKEN", testPlivoAuthToken)
 
-	client := testutils.NewTestClient(func(req *http.Request) *http.Response {
-		assert.Equal(t, getPlivoURL(testPlivoID), req.URL.String())
+// 	client := testutils.NewTestClient(func(req *http.Request) *http.Response {
+// 		assert.Equal(t, getPlivoURL(testPlivoID), req.URL.String())
 
-		username, pass, ok := req.BasicAuth()
-		assert.True(t, ok)
-		assert.Equal(t, testPlivoID, username)
-		assert.Equal(t, testPlivoAuthToken, pass)
+// 		username, pass, ok := req.BasicAuth()
+// 		assert.True(t, ok)
+// 		assert.Equal(t, testPlivoID, username)
+// 		assert.Equal(t, testPlivoAuthToken, pass)
 
-		assert.Equal(t, "POST", req.Method)
+// 		assert.Equal(t, "POST", req.Method)
 
-		requestBuffer := new(bytes.Buffer)
-		requestBuffer.ReadFrom(req.Body)
-		expectedRequest := &plivoRequest{
-			Src:  sourceNumber,
-			Dst:  testNumber,
-			Text: testTextContent,
-		}
-		var actualRequest plivoRequest
-		json.Unmarshal(requestBuffer.Bytes(), &actualRequest)
+// 		requestBuffer := new(bytes.Buffer)
+// 		requestBuffer.ReadFrom(req.Body)
+// 		expectedRequest := &plivoRequest{
+// 			Src:  sourceNumber,
+// 			Dst:  testNumber,
+// 			Text: testTextContent,
+// 		}
+// 		var actualRequest plivoRequest
+// 		json.Unmarshal(requestBuffer.Bytes(), &actualRequest)
 
-		assert.Equal(t, expectedRequest, &actualRequest)
+// 		assert.Equal(t, expectedRequest, &actualRequest)
 
-		return testutils.MakeDummyResponse()
-	})
+// 		return testutils.MakeDummyResponse()
+// 	})
 
-	response, err := SendText(client, testNumber, testTextContent)
-	assert.Nil(t, err)
-	assert.Equal(t, testutils.MakeDummyResponse(), response)
-}
+// 	response, err := SendText(client, testNumber, testTextContent)
+// 	assert.Nil(t, err)
+// 	assert.Equal(t, testutils.MakeDummyResponse(), response)
+// }

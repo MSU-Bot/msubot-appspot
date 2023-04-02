@@ -1,9 +1,7 @@
 package serverutils
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -12,8 +10,11 @@ import (
 	"strings"
 
 	"cloud.google.com/go/firestore"
+	firebase "firebase.google.com/go/v4"
+	"firebase.google.com/go/v4/auth"
+	"github.com/MSU-Bot/msubot-appspot/server/models"
 	"github.com/PuerkitoBio/goquery"
-	"github.com/SpencerCornish/msubot-appspot/server/models"
+	"github.com/plivo/plivo-go"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -22,6 +23,32 @@ const (
 	departmentRequestURL = "https://prodmyinfo.montana.edu/pls/bzagent/bzskcrse.PW_SelSchClass"
 	sourceNumber         = "14068000110"
 )
+
+type conn struct {
+	fbApp *firebase.App
+}
+
+var Conn *conn
+
+func New(fbApp *firebase.App) {
+	Conn = &conn{
+		fbApp: fbApp,
+	}
+
+}
+
+// GetFirebaseClient creates and returns a new firebase client, used to interact with the database
+func GetFirebaseClient(ctx context.Context) *firestore.Client {
+	fbClient, err := Conn.fbApp.Firestore(ctx)
+	defer fbClient.Close()
+	if err != nil {
+		log.WithContext(ctx).WithError(err).Errorf("Could not create new client for Firebase")
+		return nil
+	}
+	log.WithContext(ctx).Infof("successfully opened firestore client")
+
+	return fbClient
+}
 
 func MakeAtlasDepartmentRequest(client *http.Client) (*http.Response, error) {
 	resp, err := http.Get(departmentRequestURL)
@@ -143,51 +170,39 @@ func ParseSectionResponse(response *http.Response, crnToFind string) ([]models.S
 // Phone Functions
 ////////////////////////////
 
-// PlivoRequest is the type sent to Plivo for texts
-type plivoRequest struct {
-	Src  string `json:"src"`
-	Dst  string `json:"dst"`
-	Text string `json:"text"`
-}
-
-func getPlivoURL(authID string) string {
-	return fmt.Sprintf("https://api.plivo.com/v1/Account/%s/Message/", authID)
-}
-
 // SendText sends a text message to the specified phone number
-func SendText(client *http.Client, number, message string) (response *http.Response, err error) {
+func SendText(client *http.Client, number, message string) error {
 	authID := os.Getenv("PLIVO_AUTH_ID")
 	authToken := os.Getenv("PLIVO_AUTH_TOKEN")
 	if authID == "" || authToken == "" {
 		panic("nil env")
 	}
-	// TODO: Create sms callback handler
-	url := getPlivoURL(authID)
-	data := plivoRequest{Src: sourceNumber, Dst: number, Text: message}
 
-	js, err := json.Marshal(data)
+	plivoClient, err := plivo.NewClient(authID, authToken, &plivo.ClientOptions{HttpClient: client})
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	request, err := http.NewRequest("POST", url, bytes.NewBuffer(js))
+	response, err := plivoClient.Messages.Create(
+		plivo.MessageCreateParams{
+			Src:  sourceNumber,
+			Dst:  number,
+			Text: message,
+		},
+	)
 	if err != nil {
-		return nil, err
+		return err
 	}
-
-	request.SetBasicAuth(authID, authToken)
-	request.Header.Add("Content-Type", "application/json")
-	resp, err := client.Do(request)
-	if err != nil {
-		return nil, err
-	}
-	resp.Body.Close()
-	return resp, err
+	log.Infof("Response: %#v\n", response)
+	return nil
 }
 
 // FetchUserDataWithNumber check firebase to see if the user exists in our database
-func FetchUserDataWithNumber(ctx context.Context, fbClient *firestore.Client, number string) (map[string]interface{}, string) {
+func FetchUserDataWithNumber(ctx context.Context, number string) (map[string]interface{}, string) {
 	checkedNumber := fmt.Sprintf("+%v", strings.Trim(number, " "))
+
+	fbClient := GetFirebaseClient(ctx)
+	defer fbClient.Close()
 
 	docs := fbClient.Collection("users").Where("number", "==", checkedNumber).Documents(ctx)
 
@@ -204,8 +219,24 @@ func FetchUserDataWithNumber(ctx context.Context, fbClient *firestore.Client, nu
 	return nil, ""
 }
 
+func GetUserdata(ctx context.Context, useruids []string) ([]*auth.UserRecord, error) {
+	authClient, err := Conn.fbApp.Auth(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	result, err := authClient.GetUsers(ctx, []auth.UserIdentifier{})
+	if err != nil {
+		return nil, err
+	}
+	return result.Users, nil
+}
+
 // LookupUserNumber looks up a user's phone number from their uid
-func LookupUserNumber(ctx context.Context, fbClient *firestore.Client, uid string) (string, error) {
+func LookupUserNumber(ctx context.Context, uid string) (string, error) {
+	fbClient := GetFirebaseClient(ctx)
+	defer fbClient.Close()
+
 	doc, err := fbClient.Collection("users").Doc(uid).Get(ctx)
 	if err != nil {
 		log.WithContext(ctx).WithError(err).Errorf("Tracked user not found. This should've been cleaned up")
@@ -214,27 +245,10 @@ func LookupUserNumber(ctx context.Context, fbClient *firestore.Client, uid strin
 	return doc.Data()["number"].(string), nil
 }
 
-// GetFirebaseClient creates and returns a new firebase client, used to interact with the database
-func GetFirebaseClient(ctx context.Context) *firestore.Client {
-	firebasePID := os.Getenv("FIREBASE_PROJECT")
-	log.WithContext(ctx).Infof("Loaded firebase project ID.")
-	if firebasePID == "" {
-		log.WithContext(ctx).Errorf("Firebase Project ID is nil, I cannot continue.")
-		panic("Firebase Project ID is nil")
-	}
-
-	fbClient, err := firestore.NewClient(ctx, firebasePID)
-	if err != nil {
-		log.WithContext(ctx).WithError(err).Errorf("Could not create new client for Firebase")
-		return nil
-	}
-	log.WithContext(ctx).Infof("successfully opened firestore client")
-
-	return fbClient
-}
-
 // MoveTrackedSection moves old sections out of the prod area
-func MoveTrackedSection(ctx context.Context, fbClient *firestore.Client, crn, uid, term string) error {
+func MoveTrackedSection(ctx context.Context, crn, uid, term string) error {
+	fbClient := GetFirebaseClient(ctx)
+	defer fbClient.Close()
 
 	// Look for an existing archive doc to add userdata to
 	docArchiveIter := fbClient.Collection("sections_archive").Where("term", "==", term).Where("crn", "==", crn).Documents(ctx)

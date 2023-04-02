@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/SpencerCornish/msubot-appspot/server/serverutils"
+	"github.com/MSU-Bot/msubot-appspot/server/serverutils"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -22,6 +22,7 @@ func HandleRequest(w http.ResponseWriter, r *http.Request) {
 	// }
 
 	fbClient := serverutils.GetFirebaseClient(ctx)
+	defer fbClient.Close()
 	if fbClient == nil {
 		w.WriteHeader(500)
 		return
@@ -74,7 +75,7 @@ func HandleRequest(w http.ResponseWriter, r *http.Request) {
 
 		log.WithContext(ctx).Infof("Moving Expired doc with uid %s because term was %v ", doc.Ref.ID, data["term"])
 
-		err := serverutils.MoveTrackedSection(ctx, fbClient, crn, doc.Ref.ID, term)
+		err := serverutils.MoveTrackedSection(ctx, crn, doc.Ref.ID, term)
 		if err != nil {
 			log.WithContext(ctx).Errorf("Unable to move doc with UID: %s", doc.Ref.ID)
 		}

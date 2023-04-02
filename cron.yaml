@@ -5,3 +5,6 @@ cron:
   - description: "periodic section check"
     url: /checktrackedsections
     schedule: every 12 minutes
+  - description: "department name update"
+    url: /updatedepartments
+    schedule: every 24 hours

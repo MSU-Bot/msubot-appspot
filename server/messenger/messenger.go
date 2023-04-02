@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/SpencerCornish/msubot-appspot/server/serverutils"
+	"github.com/MSU-Bot/msubot-appspot/server/serverutils"
 	"github.com/plivo/plivo-go/xml"
 
 	log "github.com/sirupsen/logrus"
@@ -28,8 +28,8 @@ func RecieveMessage(w http.ResponseWriter, r *http.Request) {
 		responseText = fmt.Sprintf("Available Commands:\nHELP - prints this help message\nLIST - lists your tracked classes and their seats")
 	} else if strings.Contains(text, "LIST") {
 		fbClient := serverutils.GetFirebaseClient(ctx)
-
-		_, uid := serverutils.FetchUserDataWithNumber(ctx, fbClient, from)
+		defer fbClient.Close()
+		_, uid := serverutils.FetchUserDataWithNumber(ctx, from)
 
 		log.WithContext(ctx).Infof("Found user with UID: %s", uid)
 

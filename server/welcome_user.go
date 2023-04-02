@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"cloud.google.com/go/firestore"
-	"github.com/SpencerCornish/msubot-appspot/server/serverutils"
+	"github.com/MSU-Bot/msubot-appspot/server/serverutils"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -47,7 +47,7 @@ func WelcomeUserHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	phNum := strings.Join(rawphNum, "")
 
-	userData, uid := serverutils.FetchUserDataWithNumber(ctx, fbClient, phNum)
+	userData, uid := serverutils.FetchUserDataWithNumber(ctx, phNum)
 	if userData == nil {
 		log.WithContext(ctx).Errorf("User doesn't exist in the database. Userdata: %v", userData)
 		w.WriteHeader(http.StatusBadRequest)
@@ -63,7 +63,7 @@ func WelcomeUserHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	messageText := fmt.Sprintf("Thanks for signing up for MSUBot! We'll text you from this number when a seat opens up. Go Cats!")
-	_, err = serverutils.SendText(client, userData["number"].(string), messageText)
+	err = serverutils.SendText(client, userData["number"].(string), messageText)
 	if err != nil {
 		log.WithContext(ctx).Errorf("Could not send text to user!")
 		w.WriteHeader(500)

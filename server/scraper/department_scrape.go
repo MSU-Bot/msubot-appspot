@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"cloud.google.com/go/firestore"
-	"github.com/SpencerCornish/msubot-appspot/server/models"
-	"github.com/SpencerCornish/msubot-appspot/server/serverutils"
+	"github.com/MSU-Bot/msubot-appspot/server/models"
+	"github.com/MSU-Bot/msubot-appspot/server/serverutils"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -78,6 +78,8 @@ func HandleDepartmentRequest(w http.ResponseWriter, r *http.Request) {
 	log.WithContext(ctx).Infof("Context loaded. Starting execution.")
 
 	fbClient := serverutils.GetFirebaseClient(ctx)
+	defer fbClient.Close()
+
 	departmentBatch := fbClient.Batch()
 
 	clientBundle := &clients{

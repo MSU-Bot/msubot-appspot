@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/SpencerCornish/msubot-appspot/server/serverutils"
+	"github.com/MSU-Bot/msubot-appspot/server/serverutils"
 	log "github.com/sirupsen/logrus"
 )
 
