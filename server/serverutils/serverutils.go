@@ -180,6 +180,7 @@ func SendEmail(userdata []*auth.UserRecord, section models.Section) error {
 	for i, user := range userdata {
 		tos[i] = mail.NewEmail(user.DisplayName, user.Email)
 	}
+	p.AddTos(from)
 	p.AddBCCs(tos...)
 
 	p.SetDynamicTemplateData("open_seats", section.AvailableSeats)
