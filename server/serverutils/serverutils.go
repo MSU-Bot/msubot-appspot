@@ -8,6 +8,7 @@ import (
 	"os"
 	"regexp"
 	"strings"
+	"time"
 
 	"cloud.google.com/go/firestore"
 	firebase "firebase.google.com/go/v4"
@@ -15,6 +16,8 @@ import (
 	"github.com/MSU-Bot/msubot-appspot/server/models"
 	"github.com/PuerkitoBio/goquery"
 	"github.com/plivo/plivo-go"
+	"github.com/sendgrid/sendgrid-go"
+	"github.com/sendgrid/sendgrid-go/helpers/mail"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -167,11 +170,40 @@ func ParseSectionResponse(response *http.Response, crnToFind string) ([]models.S
 }
 
 ////////////////////////////
-// Phone Functions
+// Notification Functions
 ////////////////////////////
+
+func SendEmail(name, emailAddress string, section models.Section) error {
+	from := mail.NewEmail("MSUBot", "noreply@unwent.com")
+	to := mail.NewEmail(name, emailAddress)
+
+	subject := fmt.Sprintf("%s-%s has %s seats open", section.DeptAbbr, section.CourseNumber, section.AvailableSeats)
+	now := time.Now()
+	plainTextContent := fmt.Sprintf(
+		`Your tracked course on MSUBot now has seats available.
+		 %s-%s: %s
+		 CRN: %s
+		 	
+		 Results as of %d.
+		`, section.DeptAbbr, section.CourseNumber, section.CourseName, section.Crn, now)
+	htmlContent := fmt.Sprintf("<strong>%s</strong>", plainTextContent)
+	message := mail.NewSingleEmail(from, subject, to, plainTextContent, htmlContent)
+	client := sendgrid.NewSendClient(os.Getenv("SENDGRID_API_KEY"))
+
+	response, err := client.Send(message)
+	if err != nil {
+		return err
+	} else {
+		log.Info(response.StatusCode)
+		log.Info(response.Body)
+		log.Info(response.Headers)
+	}
+	return nil
+}
 
 // SendText sends a text message to the specified phone number
 func SendText(client *http.Client, number, message string) error {
+
 	authID := os.Getenv("PLIVO_AUTH_ID")
 	authToken := os.Getenv("PLIVO_AUTH_TOKEN")
 	if authID == "" || authToken == "" {
@@ -219,17 +251,17 @@ func FetchUserDataWithNumber(ctx context.Context, number string) (map[string]int
 	return nil, ""
 }
 
-func GetUserdata(ctx context.Context, useruids []string) ([]*auth.UserRecord, error) {
+func GetUserdata(ctx context.Context, useruid string) (*auth.UserRecord, error) {
 	authClient, err := Conn.fbApp.Auth(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	result, err := authClient.GetUsers(ctx, []auth.UserIdentifier{})
+	result, err := authClient.GetUser(ctx, useruid)
 	if err != nil {
 		return nil, err
 	}
-	return result.Users, nil
+	return result, nil
 }
 
 // LookupUserNumber looks up a user's phone number from their uid

@@ -2,7 +2,6 @@ package checksections
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"strconv"
 
@@ -261,24 +260,14 @@ func removeSectionFromUserData(ctx context.Context, fbClient *firestore.Client, 
 }
 
 func sendOpenSeatMessages(ctx context.Context, client *http.Client, fbClient *firestore.Client, users []interface{}, section models.Section) error {
-	var userNumbers string
-	message := fmt.Sprintf("%v%v - %v with CRN %v has %v open seats! Get to MyInfo and register before it's gone!", section.DeptAbbr, section.CourseNumber, section.CourseName, section.Crn, section.AvailableSeats)
 	for _, user := range users {
-		number, err := serverutils.LookupUserNumber(ctx, user.(string))
+		userData, err := serverutils.GetUserdata(ctx, user.(string))
+
+		err = serverutils.SendEmail(userData.DisplayName, userData.Email, section)
 		if err != nil {
-			log.WithContext(ctx).Errorf("Unable to send a text to user %s", user.(string))
-			continue
+			log.WithContext(ctx).Errorf("error sending email: %v", err)
+			return err
 		}
-		if userNumbers == "" {
-			userNumbers = number
-		} else {
-			userNumbers = fmt.Sprintf("%v<%v", userNumbers, number)
-		}
-	}
-	err := serverutils.SendText(client, userNumbers, message)
-	if err != nil {
-		log.WithContext(ctx).Errorf("error sending text: %v", err)
-		return err
 	}
 	return nil
 }
