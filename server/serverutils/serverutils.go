@@ -27,22 +27,19 @@ const (
 	sourceNumber         = "14068000110"
 )
 
-type conn struct {
-	fbApp *firebase.App
-}
-
-var Conn *conn
-
-func New(fbApp *firebase.App) {
-	Conn = &conn{
-		fbApp: fbApp,
-	}
-
+func GetFirebaseApp(ctx context.Context) (*firebase.App, error) {
+	return firebase.NewApp(ctx, &firebase.Config{})
 }
 
 // GetFirebaseClient creates and returns a new firebase client, used to interact with the database
 func GetFirebaseClient(ctx context.Context) *firestore.Client {
-	fbClient, err := Conn.fbApp.Firestore(ctx)
+	fbApp, err := GetFirebaseApp(ctx)
+	if err != nil {
+		log.WithContext(ctx).WithError(err).Errorf("Could not create new appclient for Firebase")
+		return nil
+	}
+
+	fbClient, err := fbApp.Firestore(ctx)
 	defer fbClient.Close()
 	if err != nil {
 		log.WithContext(ctx).WithError(err).Errorf("Could not create new client for Firebase")
@@ -252,7 +249,13 @@ func FetchUserDataWithNumber(ctx context.Context, number string) (map[string]int
 }
 
 func GetUserdata(ctx context.Context, useruid string) (*auth.UserRecord, error) {
-	authClient, err := Conn.fbApp.Auth(ctx)
+	fbApp, err := GetFirebaseApp(ctx)
+	if err != nil {
+		log.WithContext(ctx).WithError(err).Errorf("Could not create new appclient for Firebase")
+		return nil, err
+	}
+
+	authClient, err := fbApp.Auth(ctx)
 	if err != nil {
 		return nil, err
 	}
