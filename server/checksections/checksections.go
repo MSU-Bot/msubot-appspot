@@ -3,7 +3,6 @@ package checksections
 import (
 	"context"
 	"errors"
-	"fmt"
 	"net/http"
 	"strconv"
 
@@ -106,7 +105,6 @@ func sectionCheckWorker(ctx context.Context, jobs <-chan *models.TrackedSectionR
 		if len(record.Users) < 1 {
 			log.WithContext(ctx).Infof("Record %s has %d users. Deleting CRN", record.ID, len(record.Users))
 
-			// TODO: Bulk operation for greater efficiency
 			err := ds.MoveTrackedSectionsToArchive(ctx, []string{record.ID})
 			if err != nil {
 				log.WithContext(ctx).Errorf("Failed to move the stale section data: %v", err)
@@ -121,7 +119,6 @@ func sectionCheckWorker(ctx context.Context, jobs <-chan *models.TrackedSectionR
 
 			sendOpenSeatMessages(ctx, client, ds, record.Users, newSectionData[0])
 
-			//TODO: Bulk this
 			err := ds.MoveTrackedSectionsToArchive(ctx, []string{record.ID})
 			if err != nil {
 				log.WithContext(ctx).Errorf("Failed to move the stale section data: %v", err)
@@ -141,29 +138,4 @@ func sectionCheckWorker(ctx context.Context, jobs <-chan *models.TrackedSectionR
 		}
 		returnChannel <- 0
 	}
-}
-
-// TODO: Move to messager package
-func sendOpenSeatMessages(ctx context.Context, client *http.Client, ds dstore.DStore, users []string, section models.Section) error {
-	var userNumbers string
-	message := fmt.Sprintf("%v%v - %v with CRN %v has %v open seats! Get to MyInfo and register before it's gone!", section.DeptAbbr, section.CourseNumber, section.CourseName, section.Crn, section.AvailableSeats)
-	for _, user := range users {
-		userRecord, err := ds.GetUser(ctx, user)
-		if err != nil {
-			log.WithContext(ctx).Errorf("Unable to get user %s", user)
-		}
-
-		if userNumbers == "" {
-			userNumbers = userRecord.PhoneNumber
-		} else {
-			userNumbers = fmt.Sprintf("%v<%v", userNumbers, userRecord.PhoneNumber)
-		}
-	}
-	resp, err := serverutils.SendText(client, userNumbers, message)
-	if err != nil {
-		log.WithContext(ctx).WithError(err).Error("error sending texts")
-		return err
-	}
-	log.WithContext(ctx).WithField("response", resp).Info("Texts sent")
-	return nil
 }

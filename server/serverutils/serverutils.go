@@ -1,9 +1,7 @@
 package serverutils
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -19,7 +17,6 @@ import (
 
 const (
 	sectionRequestURL = "https://prodmyinfo.montana.edu/pls/bzagent/bzskcrse.PW_ListSchClassSimple"
-	sourceNumber      = "14068000110"
 )
 
 // MakeAtlasSectionRequest makes a request to Atlas for section data in the term, department, and course
@@ -105,53 +102,6 @@ func ParseSectionResponse(response *http.Response, termString, crnToFind string)
 	}
 	doc = nil
 	return sections, nil
-}
-
-////////////////////////////
-// Phone Functions
-////////////////////////////
-
-// PlivoRequest is the type sent to Plivo for texts
-type plivoRequest struct {
-	Src  string `json:"src"`
-	Dst  string `json:"dst"`
-	Text string `json:"text"`
-}
-
-func getPlivoURL(authID string) string {
-	return fmt.Sprintf("https://api.plivo.com/v1/Account/%s/Message/", authID)
-}
-
-// SendText sends a text message to the specified phone number
-func SendText(client *http.Client, number, message string) (response *http.Response, err error) {
-	authID := os.Getenv("PLIVO_AUTH_ID")
-	authToken := os.Getenv("PLIVO_AUTH_TOKEN")
-	if authID == "" || authToken == "" {
-		panic("nil env")
-	}
-
-	// TODO: Create sms callback handler
-	url := getPlivoURL(authID)
-	data := plivoRequest{Src: sourceNumber, Dst: number, Text: message}
-
-	js, err := json.Marshal(data)
-	if err != nil {
-		return nil, err
-	}
-
-	request, err := http.NewRequest("POST", url, bytes.NewBuffer(js))
-	if err != nil {
-		return nil, err
-	}
-
-	request.SetBasicAuth(authID, authToken)
-	request.Header.Add("Content-Type", "application/json")
-	resp, err := client.Do(request)
-	if err != nil {
-		return nil, err
-	}
-	resp.Body.Close()
-	return resp, err
 }
 
 // FetchUserDataWithNumber check firebase to see if the user exists in our database
