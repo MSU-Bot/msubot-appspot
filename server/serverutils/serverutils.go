@@ -171,7 +171,7 @@ func ParseSectionResponse(response *http.Response, crnToFind string) ([]models.S
 
 func SendEmail(userdata []*auth.UserRecord, section models.Section) error {
 	m := mail.NewV3Mail()
-	from := mail.NewEmail("MSUBot", "noreply@unwent.com")
+	from := mail.NewEmail("MSUBot", "notifications@msubot.app")
 	m.SetFrom(from)
 	m.SetTemplateID("d-2be4c913792e48a7ac9860f4216967e3")
 
