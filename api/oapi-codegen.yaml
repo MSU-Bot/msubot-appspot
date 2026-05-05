@@ -1,0 +1,7 @@
+package: api
+generate:
+  chi-server: true
+  strict-server: true
+  models: true
+# Resolved relative to the working directory when `go generate` runs (package dir: internal/api).
+output: api.gen.go

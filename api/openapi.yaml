@@ -1,0 +1,824 @@
+openapi: 3.0.3
+info:
+  title: MSUBot API
+  description: |
+    Course section search, live seat occupancy, user watchlists, and admin jobs for MSUBot.
+
+    - **Index data** (`GET /courses`, suggestions): Postgres snapshot; seat counts are not real-time (`seatsLive: false`).
+    - **Live data** (`GET /courses/{crn}`, `POST /courses/occupancy`): MSU Atlas scrape; `seatsLive: true`.
+
+    **Term codes** are 6-digit strings, e.g. `202530` (Spring), `202550` (Summer), `202570` (Fall).
+  version: 1.0.0
+  license:
+    name: Proprietary
+
+servers:
+  - url: https://api.example.com
+    description: Production (replace with your Render URL)
+
+tags:
+  - name: Public
+    description: Unauthenticated course search and stats
+  - name: Auth
+    description: Registration, login, session revocation
+  - name: User
+    description: Current user profile and tracked sections
+  - name: Admin
+    description: Cron/admin jobs (requires X-Admin-Key)
+
+paths:
+  /stats:
+    get:
+      tags: [Public]
+      summary: Service analytics
+      description: |
+        Aggregate metrics for dashboards. `alertsSentThisTerm` is populated when a notifications log exists in the backend.
+      operationId: getStats
+      parameters:
+        - $ref: "#/components/parameters/TermOptional"
+        - name: limit
+          in: query
+          description: Max rows in `mostTrackedCourses`
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 5
+      responses:
+        "200":
+          description: Stats for the requested (or default) term
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Stats"
+        default:
+          description: Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /courses:
+    get:
+      tags: [Public]
+      summary: List sections from the index
+      description: |
+        Query the Postgres course index. Seat counts reflect the last index run (`seatsLive: false`).
+        Provide structured filters and/or free-text `q`. If `q` is used without `term`, the server may default to current/upcoming terms.
+      operationId: listCourses
+      parameters:
+        - name: term
+          in: query
+          description: Term code (e.g. `202570`). May be omitted when using `q` if the server applies a default.
+          schema:
+            type: string
+            pattern: "^[0-9]{6}$"
+            example: "202570"
+        - name: q
+          in: query
+          description: Unified search across course name, department name/abbreviation, course number, and instructor
+          schema:
+            type: string
+        - name: dept
+          in: query
+          schema:
+            type: string
+        - name: courseNumber
+          in: query
+          schema:
+            type: string
+        - name: instructor
+          in: query
+          description: Partial match
+          schema:
+            type: string
+        - name: availableOnly
+          in: query
+          schema:
+            type: boolean
+        - name: courseType
+          in: query
+          description: e.g. Lecture, Lab, Recitation
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Matching sections
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Section"
+        default:
+          description: Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /courses/suggestions:
+    get:
+      tags: [Public]
+      summary: Autocomplete suggestions
+      description: Lightweight index rows for search UI (no seat data).
+      operationId: listCourseSuggestions
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+        - $ref: "#/components/parameters/TermOptional"
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 10
+      responses:
+        "200":
+          description: Suggestions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CourseSuggestion"
+        default:
+          description: Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /courses/{crn}:
+    get:
+      tags: [Public]
+      summary: Live section by CRN
+      description: |
+        Resolves `term`, department, and course from the index, then live-scrapes Atlas. `seatsLive: true`.
+      operationId: getCourseByCrn
+      parameters:
+        - $ref: "#/components/parameters/CrnPath"
+      responses:
+        "200":
+          description: Current section data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Section"
+        "404":
+          description: CRN not found in index
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "502":
+          description: Atlas upstream error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        default:
+          description: Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /courses/occupancy:
+    post:
+      tags: [Public]
+      summary: Batch live occupancy
+      description: |
+        Live seat counts for many CRNs in one request. Server batches Atlas calls by term/dept/course.
+        On partial failure, HTTP 207 may be used with per-CRN errors.
+      operationId: postCoursesOccupancy
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OccupancyRequest"
+      responses:
+        "200":
+          description: All requested CRNs resolved
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/OccupancyResult"
+        "207":
+          description: Partial success; some CRNs failed
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/OccupancyResult"
+        default:
+          description: Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/register:
+    post:
+      tags: [Auth]
+      summary: Register
+      operationId: register
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterRequest"
+      responses:
+        "201":
+          description: Created; returns JWT
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        default:
+          description: Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Login
+      operationId: login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: JWT issued
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        default:
+          description: Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/session:
+    delete:
+      tags: [Auth]
+      summary: Log out (invalidate token)
+      description: Invalidates the current JWT (e.g. via server-side blocklist).
+      operationId: deleteSession
+      security:
+        - BearerAuth: []
+      responses:
+        "204":
+          description: Session revoked
+        default:
+          description: Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /users/me:
+    get:
+      tags: [User]
+      summary: Current user
+      operationId: getMe
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: User profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        default:
+          description: Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    patch:
+      tags: [User]
+      summary: Update profile / notification preferences
+      operationId: patchMe
+      security:
+        - BearerAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PatchUserRequest"
+      responses:
+        "200":
+          description: Updated user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        default:
+          description: Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      tags: [User]
+      summary: Delete account
+      description: Deletes the user and all tracked sections.
+      operationId: deleteMe
+      security:
+        - BearerAuth: []
+      responses:
+        "204":
+          description: Deleted
+        default:
+          description: Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /users/me/sections:
+    get:
+      tags: [User]
+      summary: List tracked sections
+      operationId: listMySections
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Watchlist
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TrackedSection"
+        default:
+          description: Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    post:
+      tags: [User]
+      summary: Track a section
+      operationId: addMySection
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddTrackedSectionRequest"
+      responses:
+        "201":
+          description: Tracked section created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TrackedSection"
+        default:
+          description: Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /users/me/sections/{crn}:
+    delete:
+      tags: [User]
+      summary: Stop tracking a section
+      operationId: deleteMySection
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CrnPath"
+      responses:
+        "204":
+          description: Removed from watchlist
+        default:
+          description: Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /admin/scrape-sections:
+    post:
+      tags: [Admin]
+      summary: Run tracked-section scrape (cron)
+      description: Checks all tracked CRNs against Atlas and sends notifications when seats open.
+      operationId: adminScrapeSections
+      security:
+        - AdminKey: []
+      responses:
+        "202":
+          description: Job accepted
+        default:
+          description: Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /admin/update-index:
+    post:
+      tags: [Admin]
+      summary: Rebuild course index (cron)
+      description: Scrapes departments and sections into Postgres.
+      operationId: adminUpdateIndex
+      security:
+        - AdminKey: []
+      responses:
+        "202":
+          description: Job accepted
+        default:
+          description: Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    AdminKey:
+      type: apiKey
+      in: header
+      name: X-Admin-Key
+
+  parameters:
+    CrnPath:
+      name: crn
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Course Reference Number
+    TermOptional:
+      name: term
+      in: query
+      description: Term code; defaults to current term when omitted
+      schema:
+        type: string
+        pattern: "^[0-9]{6}$"
+        example: "202570"
+
+  schemas:
+    Section:
+      type: object
+      required:
+        - crn
+        - term
+        - deptAbbr
+        - deptName
+        - courseNumber
+        - courseName
+        - courseType
+        - sectionNumber
+        - credits
+        - instructor
+        - time
+        - location
+        - totalSeats
+        - takenSeats
+        - availableSeats
+        - seatsLive
+      properties:
+        crn:
+          type: string
+        term:
+          type: string
+          pattern: "^[0-9]{6}$"
+        deptAbbr:
+          type: string
+        deptName:
+          type: string
+        courseNumber:
+          type: string
+        courseName:
+          type: string
+        courseType:
+          type: string
+        sectionNumber:
+          type: string
+        credits:
+          type: string
+        instructor:
+          type: string
+        time:
+          type: string
+        location:
+          type: string
+        totalSeats:
+          type: integer
+          minimum: 0
+        takenSeats:
+          type: integer
+          minimum: 0
+        availableSeats:
+          type: integer
+          minimum: 0
+        seatsLive:
+          type: boolean
+          description: true if seat counts came from a live Atlas scrape
+
+    User:
+      type: object
+      required:
+        - id
+        - email
+        - notificationPreferences
+        - createdAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        notificationPreferences:
+          $ref: "#/components/schemas/NotificationPreferences"
+        createdAt:
+          type: string
+          format: date-time
+
+    NotificationPreferences:
+      type: object
+      required:
+        - email
+        - emailEnabled
+      properties:
+        email:
+          type: string
+          format: email
+          description: Destination for email alerts (may differ from login email)
+        emailEnabled:
+          type: boolean
+      additionalProperties: true
+      description: Extensible for future channels (e.g. SMS, push)
+
+    CourseSuggestion:
+      type: object
+      required:
+        - deptAbbr
+        - deptName
+        - courseNumber
+        - courseName
+      properties:
+        deptAbbr:
+          type: string
+        deptName:
+          type: string
+        courseNumber:
+          type: string
+        courseName:
+          type: string
+
+    OccupancyRequest:
+      type: object
+      required:
+        - crns
+      properties:
+        crns:
+          type: array
+          items:
+            type: string
+          minItems: 1
+          maxItems: 200
+          description: CRNs to resolve and scrape
+
+    OccupancyResult:
+      type: object
+      required:
+        - crn
+      description: |
+        On full success, includes seat counts and `seatsLive: true`.
+        On partial failure (HTTP 207), failed rows include `error` and may omit seat fields.
+      properties:
+        crn:
+          type: string
+        totalSeats:
+          type: integer
+          minimum: 0
+        takenSeats:
+          type: integer
+          minimum: 0
+        availableSeats:
+          type: integer
+          minimum: 0
+        seatsLive:
+          type: boolean
+          description: true when seat counts are from a live Atlas scrape
+        error:
+          type: string
+          description: Present when this CRN failed in a 207 partial response
+
+    TrackedSection:
+      type: object
+      required:
+        - crn
+        - term
+        - section
+        - addedAt
+      properties:
+        crn:
+          type: string
+        term:
+          type: string
+          pattern: "^[0-9]{6}$"
+        section:
+          $ref: "#/components/schemas/Section"
+        addedAt:
+          type: string
+          format: date-time
+        lastCheckedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: Last cron-triggered live check for this CRN; null if not yet checked
+
+    AuthResponse:
+      type: object
+      required:
+        - token
+        - expiresIn
+        - user
+      properties:
+        token:
+          type: string
+        expiresIn:
+          type: integer
+          description: JWT lifetime in seconds
+          minimum: 1
+        user:
+          $ref: "#/components/schemas/User"
+
+    RegisterRequest:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          format: password
+          minLength: 8
+        name:
+          type: string
+
+    LoginRequest:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          format: password
+
+    PatchUserRequest:
+      type: object
+      description: Omitted fields are unchanged. Preferences may be sent partially.
+      properties:
+        notificationPreferences:
+          type: object
+          properties:
+            email:
+              type: string
+              format: email
+            emailEnabled:
+              type: boolean
+          additionalProperties: true
+
+    AddTrackedSectionRequest:
+      type: object
+      required:
+        - crn
+        - term
+      properties:
+        crn:
+          type: string
+        term:
+          type: string
+          pattern: "^[0-9]{6}$"
+
+    SeatAvailability:
+      type: object
+      required:
+        - openSections
+        - fullSections
+        - percentOpen
+      properties:
+        openSections:
+          type: integer
+          minimum: 0
+        fullSections:
+          type: integer
+          minimum: 0
+        percentOpen:
+          type: number
+          minimum: 0
+          maximum: 100
+
+    MostTrackedCourse:
+      type: object
+      required:
+        - deptAbbr
+        - courseNumber
+        - courseName
+        - trackedCount
+      properties:
+        deptAbbr:
+          type: string
+        courseNumber:
+          type: string
+        courseName:
+          type: string
+        trackedCount:
+          type: integer
+          minimum: 0
+          description: Users watching any section of this course
+
+    Stats:
+      type: object
+      required:
+        - term
+        - totalSections
+        - totalDepartments
+        - totalUsers
+        - totalTrackedSections
+        - alertsSentThisTerm
+        - seatAvailability
+        - mostTrackedCourses
+      properties:
+        term:
+          type: string
+          description: Scoped term, or a sentinel such as `all` when not filtered
+        totalSections:
+          type: integer
+          minimum: 0
+        totalDepartments:
+          type: integer
+          minimum: 0
+        totalUsers:
+          type: integer
+          minimum: 0
+        totalTrackedSections:
+          type: integer
+          minimum: 0
+          description: Distinct CRNs on any user's watchlist
+        alertsSentThisTerm:
+          type: integer
+          minimum: 0
+          description: Requires notifications log in the backend
+        seatAvailability:
+          $ref: "#/components/schemas/SeatAvailability"
+        mostTrackedCourses:
+          type: array
+          items:
+            $ref: "#/components/schemas/MostTrackedCourse"
+        indexLastUpdatedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: When the index was last fully updated; null if never run
+
+    ErrorResponse:
+      type: object
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: string
+        message:
+          type: string
